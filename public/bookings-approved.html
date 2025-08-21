@@ -1,0 +1,253 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Approved Bookings - Furry Tails Meycauayan</title>
+    <link rel="stylesheet" href="style.css" />
+    <link rel="stylesheet" href="tables.css" />
+    <link rel="stylesheet" href="modal.css" />
+    <link rel="stylesheet" href="print.css" />
+    <style>
+      .status-badge {
+        padding: 6px 12px;
+        border-radius: 4px;
+        font-size: 14px;
+        font-weight: 500;
+        display: inline-block;
+      }
+      .status-approved {
+        background-color: #e8f5e9;
+        color: #2e7d32;
+      }
+      .status-completed {
+        background-color: #e0f2f7;
+        color: #01579b;
+      }
+      .status-checked-out {
+        background-color: #f3e5f5;
+        color: #6a1b9a;
+      }
+
+      /* Action button styles */
+      .action-btn {
+        display: inline-block !important;
+        visibility: visible !important;
+        opacity: 1 !important;
+        margin: 2px !important;
+        padding: 8px 12px !important;
+        border: none !important;
+        border-radius: 5px !important;
+        cursor: pointer !important;
+        font-size: 0.9em !important;
+        font-weight: 600 !important;
+        text-decoration: none !important;
+        transition:
+          background-color 0.2s ease,
+          transform 0.1s ease !important;
+      }
+
+      .btn-view {
+        background-color: #ffb64a !important;
+        color: white !important;
+      }
+
+      .btn-view:hover {
+        background-color: #e6a23c !important;
+        transform: translateY(-1px) !important;
+      }
+
+      .btn-checkout {
+        background-color: #17a2b8 !important;
+        color: white !important;
+      }
+
+      .btn-checkout:hover {
+        background-color: #138496 !important;
+        transform: translateY(-1px) !important;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="dashboard-container">
+      <div class="sidebar">
+        <h1>Admin</h1>
+        <p class="welcome-text">Welcome, admin</p>
+
+        <nav>
+          <a href="dashboard.html">Dashboard</a>
+          <a href="users.html">Users</a>
+          <a href="pets.html">Pets</a>
+          <a href="bookings.html">Pending Bookings</a>
+          <a href="bookings-approved.html" class="active">Bookings</a>
+
+          <!-- Reports Sub-menu -->
+          <div class="nav-item">
+            <a href="#" class="nav-link" id="reportsDropdown">Reports ▼</a>
+            <div class="submenu active" id="reportsSubmenu">
+              <a href="booking-reports.html">Booking Reports</a>
+              <a href="feeding-reports.html">Feeding Reports</a>
+              <a href="sales-reports.html">Sales Reports</a>
+            </div>
+          </div>
+        </nav>
+
+        <a href="#" class="logout" id="logoutButton">Logout</a>
+      </div>
+
+      <div class="main-content">
+        <h1>Approved Bookings</h1>
+
+        <div class="print-header print-only">
+          <h1 id="printReportTitle">Approved Bookings</h1>
+          <div class="meta">
+            Furry Tails Meycauayan • Generated:
+            <span id="printTimestamp"></span>
+          </div>
+        </div>
+
+        <div
+          class="controls-container"
+          style="
+            margin-bottom: 20px;
+            display: flex;
+            gap: 15px;
+            align-items: center;
+          "
+        >
+          <div class="filter-group">
+            <label
+              for="statusFilter"
+              style="margin-right: 8px; font-weight: 500"
+              >Filter by Status:</label
+            >
+            <select
+              id="statusFilter"
+              style="
+                padding: 8px 12px;
+                border: 1px solid #ddd;
+                border-radius: 4px;
+                background: white;
+              "
+            >
+              <option value="All">All Approved</option>
+              <option value="Approved">Approved</option>
+              <option value="Accepted">Accepted</option>
+              <option value="Completed">Completed</option>
+              <option value="Checked-Out">Checked-Out</option>
+            </select>
+          </div>
+          <button
+            id="refreshBookingsBtn"
+            style="
+              padding: 8px 16px;
+              background: #ffb64a;
+              color: white;
+              border: none;
+              border-radius: 4px;
+              cursor: pointer;
+            "
+          >
+            Refresh
+          </button>
+          <button
+            id="printReportBtn"
+            class="no-print"
+            style="
+              padding: 8px 16px;
+              background: #4a90e2;
+              color: white;
+              border: none;
+              border-radius: 4px;
+              cursor: pointer;
+            "
+          >
+            Print
+          </button>
+        </div>
+
+        <div class="table-container">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Booking ID</th>
+                <th>Pet Name</th>
+                <th>Owner Name</th>
+                <th>Service Type</th>
+                <th>Room Type</th>
+                <th>Check-in Date</th>
+                <th>Duration</th>
+                <th>Status</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="approvedBookingsTableBody">
+              <tr>
+                <td colspan="9" style="text-align: center; padding: 20px">
+                  Loading approved bookings...
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <div id="detailsModal" class="modal">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h2 id="modalHeader">Booking Details</h2>
+          <button id="modalCloseBtn" class="close-modal">&times;</button>
+        </div>
+        <div class="modal-body" id="modalBody"></div>
+        <div class="modal-footer">
+          <button id="modalCloseBtnFooter" class="btn btn-secondary">
+            Close
+          </button>
+        </div>
+      </div>
+    </div>
+    <div id="overlay" class="overlay"></div>
+
+    <script type="module" src="js/firebase-config.js"></script>
+    <script type="module" src="js/modal_handler.js"></script>
+    <script type="module" src="js/bookings-approved.js"></script>
+    <script type="module" src="js/print.js"></script>
+    <script type="module">
+      import { initializeLogout } from "./js/logout-handler.js";
+      initializeLogout();
+    </script>
+    <script type="module">
+      import { setupPrint } from "./js/print.js";
+      setupPrint("Approved Bookings");
+    </script>
+
+    <!-- Sub-menu Toggle Script -->
+    <script>
+      document.addEventListener("DOMContentLoaded", function () {
+        const reportsDropdown = document.getElementById("reportsDropdown");
+        const reportsSubmenu = document.getElementById("reportsSubmenu");
+
+        reportsDropdown.addEventListener("click", function (e) {
+          e.preventDefault();
+          reportsSubmenu.classList.toggle("active");
+
+          // Change arrow direction
+          if (reportsSubmenu.classList.contains("active")) {
+            reportsDropdown.innerHTML = "Reports ▲";
+          } else {
+            reportsDropdown.innerHTML = "Reports ▼";
+          }
+        });
+
+        // Close submenu when clicking outside
+        document.addEventListener("click", function (e) {
+          if (!e.target.closest(".nav-item")) {
+            reportsSubmenu.classList.remove("active");
+            reportsDropdown.innerHTML = "Reports ▼";
+          }
+        });
+      });
+    </script>
+  </body>
+</html>
