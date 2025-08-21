@@ -7,6 +7,7 @@
     <link rel="stylesheet" href="style.css" />
     <link rel="stylesheet" href="tables.css" />
     <link rel="stylesheet" href="modal.css" />
+    <link rel="stylesheet" href="css/modal.css" />
     <style>
       .status-badge {
         padding: 6px 12px;
@@ -160,29 +161,6 @@
           "
         >
           <div class="filter-group">
-            <label
-              for="statusFilter"
-              style="margin-right: 8px; font-weight: 500"
-              >Filter by Status:</label
-            >
-            <select
-              id="statusFilter"
-              style="
-                padding: 8px 12px;
-                border: 1px solid #ddd;
-                border-radius: 4px;
-                background: white;
-              "
-            >
-              <option value="Pending">Pending</option>
-              <option value="Approved">Approved</option>
-              <option value="Rejected">Rejected</option>
-              <option value="Cancelled">Cancelled</option>
-              <option value="Checked-Out">Checked-Out</option>
-              <option value="All">All Pending Bookings</option>
-            </select>
-          </div>
-          <div class="filter-group">
             <label for="dateFilter" style="margin-right: 8px; font-weight: 500"
               >Filter by Date:</label
             >
@@ -272,19 +250,6 @@
             "
           >
             Refresh
-          </button>
-          <button
-            id="showAllBookingsBtn"
-            style="
-              padding: 8px 16px;
-              background: #6c757d;
-              color: white;
-              border: none;
-              border-radius: 4px;
-              cursor: pointer;
-            "
-          >
-            Show All
           </button>
 
         </div>

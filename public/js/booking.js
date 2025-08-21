@@ -35,11 +35,6 @@ document.addEventListener("DOMContentLoaded", async () => {
     console.error("bookingsTableBody not found!");
     return;
   }
-  if (!statusFilterSelect) {
-    console.error(
-      "statusFilterSelect not found! Please add a select element with id='statusFilter' in your HTML."
-    );
-  }
   if (!refreshButton) {
     console.error(
       "refreshButton not found! Please add a button with id='refreshBookingsBtn' in your HTML."
