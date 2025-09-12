@@ -89,8 +89,6 @@ document.addEventListener("DOMContentLoaded", async () => {
     });
   }
 
-
-
   /**
    * Fetches all booking documents from the "bookings" collection in Firestore.
    * Orders them by 'timestamp' in descending order.
@@ -127,13 +125,13 @@ document.addEventListener("DOMContentLoaded", async () => {
       const now = new Date();
       const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
       const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-      
-      startDate.value = firstDay.toISOString().split('T')[0];
-      endDate.value = lastDay.toISOString().split('T')[0];
+
+      startDate.value = firstDay.toISOString().split("T")[0];
+      endDate.value = lastDay.toISOString().split("T")[0];
     } else {
       customDateInputs.style.display = "none";
     }
-    
+
     // Apply the filter
     applyFilters();
   };
@@ -146,6 +144,22 @@ document.addEventListener("DOMContentLoaded", async () => {
   };
 
   /**
+   * Determines if a booking has the minimum required details to be accepted.
+   * Currently enforces vaccination record presence for Boarding services.
+   * @param {Object} booking - The booking object
+   * @returns {boolean} - True if booking details are complete enough to accept
+   */
+  function isBookingDetailsComplete(booking) {
+    // Require vaccination record image for Boarding
+    if ((booking.serviceType || "").toLowerCase() === "boarding") {
+      const hasVaccinationImage = !!booking.vaccinationRecord?.imageUrl;
+      return hasVaccinationImage;
+    }
+    // For non-boarding services, accept by default unless specified later
+    return true;
+  }
+
+  /**
    * Get the appropriate date for filtering from a booking
    * @param {Object} booking - The booking object
    * @returns {Date|null} - The date to use for filtering
@@ -156,24 +170,24 @@ document.addEventListener("DOMContentLoaded", async () => {
       const date = new Date(booking.boardingDetails.checkInDate);
       if (!isNaN(date.getTime())) return date;
     }
-    
+
     // Try grooming check-in date
     if (booking.groomingDetails?.groomingCheckInDate) {
       const date = new Date(booking.groomingDetails.groomingCheckInDate);
       if (!isNaN(date.getTime())) return date;
     }
-    
+
     // Try the top-level date field
     if (booking.date) {
       const date = new Date(booking.date);
       if (!isNaN(date.getTime())) return date;
     }
-    
+
     // Try the timestamp
     if (booking.timestamp) {
       return booking.timestamp.toDate();
     }
-    
+
     return null;
   };
 
@@ -206,8 +220,24 @@ document.addEventListener("DOMContentLoaded", async () => {
         if (!bookingDate) return false;
 
         const now = new Date();
-        const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
-        const todayEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
+        const todayStart = new Date(
+          now.getFullYear(),
+          now.getMonth(),
+          now.getDate(),
+          0,
+          0,
+          0,
+          0
+        );
+        const todayEnd = new Date(
+          now.getFullYear(),
+          now.getMonth(),
+          now.getDate(),
+          23,
+          59,
+          59,
+          999
+        );
 
         let filterStartDate = todayStart;
         let filterEndDate = todayEnd;
@@ -245,7 +275,7 @@ document.addEventListener("DOMContentLoaded", async () => {
           case "custom":
             const startDateValue = startDate.value;
             const endDateValue = endDate.value;
-            
+
             if (startDateValue && endDateValue) {
               filterStartDate = new Date(startDateValue);
               filterStartDate.setHours(0, 0, 0, 0);
@@ -294,6 +324,10 @@ document.addEventListener("DOMContentLoaded", async () => {
       }
 
       const row = document.createElement("tr");
+      const canAccept = booking.status === "Pending" && isBookingDetailsComplete(booking);
+      const acceptDisabledAttr = canAccept
+        ? ""
+        : "disabled aria-disabled=\"true\" title=\"Complete vaccination record to accept\"";
       row.innerHTML = `
         <td>${booking.id}</td>
         <td>${booking.petInformation?.petName || "N/A"}</td>
@@ -307,12 +341,18 @@ document.addEventListener("DOMContentLoaded", async () => {
           ${
             booking.status === "Pending"
               ? `
-            <button class="action-btn btn-accept" data-id="${booking.id}">Accept</button>
+            <button class="action-btn btn-accept" data-id="${booking.id}" ${acceptDisabledAttr}>Accept</button>
             <button class="action-btn btn-reject" data-id="${booking.id}">Reject</button>
           `
-              : `
+              : booking.status === "Approved"
+                ? `
+            <button class="action-btn btn-checkin" data-id="${booking.id}">Check In</button>
+          `
+                : booking.status === "Check In"
+                  ? `
             <button class="action-btn btn-checkout" data-id="${booking.id}">Checkout</button>
           `
+                  : ""
           }
         </td>
         <td>
@@ -347,6 +387,9 @@ document.addEventListener("DOMContentLoaded", async () => {
     document
       .querySelectorAll(".btn-checkout")
       .forEach((btn) => btn.removeEventListener("click", handleCheckoutClick));
+    document
+      .querySelectorAll(".btn-checkin")
+      .forEach((btn) => btn.removeEventListener("click", handleCheckinClick));
 
     // Attach new listeners
     document.querySelectorAll(".btn-accept").forEach((btn) => {
@@ -361,6 +404,9 @@ document.addEventListener("DOMContentLoaded", async () => {
     document.querySelectorAll(".btn-checkout").forEach((btn) => {
       btn.addEventListener("click", handleCheckoutClick);
     });
+    document.querySelectorAll(".btn-checkin").forEach((btn) => {
+      btn.addEventListener("click", handleCheckinClick);
+    });
   };
 
   /**
@@ -369,6 +415,11 @@ document.addEventListener("DOMContentLoaded", async () => {
    */
   const handleAcceptClick = async (e) => {
     const bookingId = e.target.getAttribute("data-id");
+    const booking = allBookingsData[bookingId];
+    if (!isBookingDetailsComplete(booking)) {
+      alert("Cannot accept booking: vaccination record is missing.");
+      return;
+    }
     const confirmAccept = await showConfirmation(
       `Confirm Acceptance for Booking ID: ${bookingId}?`,
       "Are you sure you want to accept this booking? This action will mark it as 'Approved'."
@@ -409,27 +460,45 @@ document.addEventListener("DOMContentLoaded", async () => {
   };
 
   /**
+   * Handles the click event for the "Check In" button.
+   * Updates the booking status to "Check In".
+   * @param {Event} e - The click event object.
+   */
+  const handleCheckinClick = async (e) => {
+    const bookingId = e.target.getAttribute("data-id");
+    const confirmCheckin = await showConfirmation(
+      `Confirm Check In for Booking ID: ${bookingId}?`,
+      "Are you sure you want to check in this pet? This action will mark the booking as 'Check In'."
+    );
+    if (confirmCheckin) {
+      const adminNotes = prompt("Add check-in notes (optional):");
+      await updateBookingStatus(bookingId, "Check In", adminNotes || "");
+      renderBookingsTable(); // Re-render to reflect new status/filter
+    }
+  };
+
+  /**
    * Handles the click event for the "Checkout" button.
    * Shows a modal with customer balance information.
    * @param {Event} e - The click event object.
    */
   const handleCheckoutClick = async (e) => {
     const bookingId = e.target.getAttribute("data-id");
-    
+
     // Simple modal with basic information
     const booking = allBookingsData[bookingId];
     if (!booking) {
       alert("Booking data not found!");
       return;
     }
-    
-    const customerName = booking.ownerInformation ? 
-      `${booking.ownerInformation.firstName || ""} ${booking.ownerInformation.lastName || ""}`.trim() : 
-      "N/A";
-    
+
+    const customerName = booking.ownerInformation
+      ? `${booking.ownerInformation.firstName || ""} ${booking.ownerInformation.lastName || ""}`.trim()
+      : "N/A";
+
     const petName = booking.petInformation?.petName || "N/A";
     const serviceType = booking.serviceType || "N/A";
-    
+
     // Simple modal content
     const modalContent = `
       <div style="padding: 20px;">
@@ -456,39 +525,38 @@ document.addEventListener("DOMContentLoaded", async () => {
         </div>
       </div>
     `;
-    
+
     // Get modal elements
     const modal = document.getElementById("viewDetailsModal");
     const modalContentDiv = document.getElementById("bookingDetailsContent");
-    
+
     if (modal && modalContentDiv) {
       // Update modal content
       modalContentDiv.innerHTML = modalContent;
-      
+
       // Show modal
       modal.style.display = "flex";
       document.getElementById("overlay").style.display = "block";
-      
+
       // Update modal title
       const modalHeader = modal.querySelector(".modal-header h2");
       if (modalHeader) {
         modalHeader.textContent = `Checkout - ${customerName}`;
       }
-      
+
       // Add close functionality
       const closeBtn = modal.querySelector("#modalCloseBtn");
       const closeFooterBtn = modal.querySelector("#modalCloseBtnFooter");
       const overlay = document.getElementById("overlay");
-      
+
       const closeModal = () => {
         modal.style.display = "none";
         overlay.style.display = "none";
       };
-      
+
       if (closeBtn) closeBtn.onclick = closeModal;
       if (closeFooterBtn) closeFooterBtn.onclick = closeModal;
       if (overlay) overlay.onclick = closeModal;
-      
     } else {
       alert("Modal elements not found!");
     }
@@ -677,7 +745,8 @@ document.addEventListener("DOMContentLoaded", async () => {
 
       if (bookingData.serviceType === "Boarding") {
         // Pricing for boarding services
-        const roomType = bookingData.boardingDetails?.selectedRoomType || "Small Kennel";
+        const roomType =
+          bookingData.boardingDetails?.selectedRoomType || "Small Kennel";
         switch (roomType) {
           case "Small Kennel":
             totalAmount = 500; // ₱500 per day
@@ -693,9 +762,15 @@ document.addEventListener("DOMContentLoaded", async () => {
         }
 
         // Calculate total based on number of days
-        const checkInDate = new Date(bookingData.boardingDetails?.checkInDate || bookingData.date);
-        const checkOutDate = new Date(bookingData.boardingDetails?.checkOutDate);
-        const daysDiff = Math.ceil((checkOutDate - checkInDate) / (1000 * 60 * 60 * 24));
+        const checkInDate = new Date(
+          bookingData.boardingDetails?.checkInDate || bookingData.date
+        );
+        const checkOutDate = new Date(
+          bookingData.boardingDetails?.checkOutDate
+        );
+        const daysDiff = Math.ceil(
+          (checkOutDate - checkInDate) / (1000 * 60 * 60 * 24)
+        );
         totalAmount = totalAmount * Math.max(1, daysDiff);
       } else if (bookingData.serviceType === "Grooming") {
         totalAmount = 800; // ₱800 for grooming service
@@ -708,20 +783,21 @@ document.addEventListener("DOMContentLoaded", async () => {
       // Create sales report data
       const salesReportData = {
         "Transaction ID": bookingId,
-        "Customer Name": bookingData.ownerInformation ? 
-          `${bookingData.ownerInformation.firstName || ""} ${bookingData.ownerInformation.lastName || ""}`.trim() : 
-          "N/A",
+        "Customer Name": bookingData.ownerInformation
+          ? `${bookingData.ownerInformation.firstName || ""} ${bookingData.ownerInformation.lastName || ""}`.trim()
+          : "N/A",
         "Service Type": bookingData.serviceType || "N/A",
         "Total Amount": totalAmount,
         "Down Payment": downPayment,
-        "Balance": balance,
+        Balance: balance,
         "Payment Method": bookingData.paymentDetails?.method || "Cash",
-        "Date": new Date().toISOString(),
-        "Status": "Completed",
+        Date: new Date().toISOString(),
+        Status: "Completed",
         "Pet Name": bookingData.petInformation?.petName || "N/A",
         "Room Type": bookingData.boardingDetails?.selectedRoomType || "N/A",
-        "Check-in Date": bookingData.boardingDetails?.checkInDate || bookingData.date || "N/A",
-        "Check-out Date": bookingData.boardingDetails?.checkOutDate || "N/A"
+        "Check-in Date":
+          bookingData.boardingDetails?.checkInDate || bookingData.date || "N/A",
+        "Check-out Date": bookingData.boardingDetails?.checkOutDate || "N/A",
       };
 
       // Add to salesR collection
@@ -750,7 +826,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       // Change "Accepted" to "Approved" for Firestore storage if desired
       if (newStatus === "Accepted") {
         statusToUpdate = "Approved";
-        
+
         // Create sales report when booking is accepted
         await createSalesReport(bookingData, bookingId);
       }
@@ -794,19 +870,23 @@ document.addEventListener("DOMContentLoaded", async () => {
    */
   async function showCheckoutModal(bookingId) {
     console.log("showCheckoutModal called with bookingId:", bookingId);
-    
+
     let bookingData = allBookingsData[bookingId]; // Try to get from cache first
     console.log("Booking data from cache:", bookingData);
 
     // If not in cache, fetch from Firestore
     if (!bookingData) {
-      console.log(`Booking ID ${bookingId} not in cache, fetching from Firestore.`);
+      console.log(
+        `Booking ID ${bookingId} not in cache, fetching from Firestore.`
+      );
       const bookingRef = doc(db, "bookings", bookingId);
       try {
         const bookingSnap = await getDoc(bookingRef);
         if (!bookingSnap.exists()) {
           alert("Booking data not found in Firestore for ID: " + bookingId);
-          console.error("Booking data not found in Firestore for ID: " + bookingId);
+          console.error(
+            "Booking data not found in Firestore for ID: " + bookingId
+          );
           return;
         }
         allBookingsData[bookingId] = bookingSnap.data(); // Cache it for future use
@@ -820,12 +900,13 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
 
     // Calculate balance using the same logic as sales reports
-    const { totalAmount, downPayment, balance } = calculateBookingAmounts(bookingData);
-    
+    const { totalAmount, downPayment, balance } =
+      calculateBookingAmounts(bookingData);
+
     // Get customer name
-    const customerName = bookingData.ownerInformation ? 
-      `${bookingData.ownerInformation.firstName || ""} ${bookingData.ownerInformation.lastName || ""}`.trim() : 
-      "N/A";
+    const customerName = bookingData.ownerInformation
+      ? `${bookingData.ownerInformation.firstName || ""} ${bookingData.ownerInformation.lastName || ""}`.trim()
+      : "N/A";
 
     // Create modal content with enhanced styling
     const modalContent = `
@@ -874,16 +955,20 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     // Get the modal element and the specific content target within it
     const viewDetailsModal = document.getElementById("viewDetailsModal");
-    const bookingDetailsContent = document.getElementById("bookingDetailsContent");
-    
+    const bookingDetailsContent = document.getElementById(
+      "bookingDetailsContent"
+    );
+
     console.log("Modal elements found:", {
       viewDetailsModal: !!viewDetailsModal,
-      bookingDetailsContent: !!bookingDetailsContent
+      bookingDetailsContent: !!bookingDetailsContent,
     });
 
     if (!viewDetailsModal || !bookingDetailsContent) {
       console.error("Modal elements not found!");
-      alert("Error: Modal elements not found. Please refresh the page and try again.");
+      alert(
+        "Error: Modal elements not found. Please refresh the page and try again."
+      );
       return;
     }
 
@@ -924,13 +1009,16 @@ document.addEventListener("DOMContentLoaded", async () => {
       let dailyPrice = sizePrices[petSize] || 0;
 
       // Calculate total based on number of days
-      const checkInDateStr = bookingData.boardingDetails?.checkInDate || bookingData.date;
+      const checkInDateStr =
+        bookingData.boardingDetails?.checkInDate || bookingData.date;
       const checkOutDateStr = bookingData.boardingDetails?.checkOutDate;
 
       if (checkInDateStr && checkOutDateStr) {
         const checkInDate = new Date(checkInDateStr);
         const checkOutDate = new Date(checkOutDateStr);
-        const diffTime = Math.abs(checkOutDate.getTime() - checkInDate.getTime());
+        const diffTime = Math.abs(
+          checkOutDate.getTime() - checkInDate.getTime()
+        );
         const daysDiff = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
         totalAmount = dailyPrice * Math.max(1, daysDiff); // Ensure at least 1 day
       } else {
@@ -942,7 +1030,9 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
 
     // Get downPayment from bookingData.paymentDetails.downPaymentAmount if available, otherwise default to 0
-    let actualDownPayment = parseFloat(bookingData.paymentDetails?.downPaymentAmount);
+    let actualDownPayment = parseFloat(
+      bookingData.paymentDetails?.downPaymentAmount
+    );
     if (isNaN(actualDownPayment)) {
       actualDownPayment = 0; // Default to 0 if not a valid number or not provided
     }

@@ -27,13 +27,13 @@ import {
 
 // Your web app's Firebase configuration
 const firebaseConfig = {
-  apiKey: "AIzaSyA6z7pXAr6GQWwuGbxl8Lhraqw9dzDjdZs",
-  authDomain: "customerappli.firebaseapp.com",
-  projectId: "customerappli",
-  storageBucket: "customerappli.firebasestorage.app",
-  messagingSenderId: "198195378144",
-  appId: "1:198195378144:web:78ee1d92b6a16342321d85",
-  measurementId: "G-X93GZ7CQL5",
+  apiKey: "AIzaSyCiP2p3gbGtcgILDfppKpuuA4Q5awURzI4",
+  authDomain: "admin-a95e4.firebaseapp.com",
+  projectId: "admin-a95e4",
+  storageBucket: "admin-a95e4.firebasestorage.app",
+  messagingSenderId: "379925509921",
+  appId: "1:379925509921:web:6bc24f943473a4b53cb060",
+  measurementId: "G-PJW31TBTF2",
 };
 
 // Initialize Firebase

@@ -28,6 +28,14 @@
         background-color: #f3e5f5;
         color: #6a1b9a;
       }
+      .status-check-in {
+        background-color: #e8f5e8; /* Light green */
+        color: #2e7d32; /* Dark green */
+      }
+      .status-extended {
+        background-color: #fff3e0; /* Light orange */
+        color: #f57c00; /* Dark orange */
+      }
 
       /* Action button styles */
       .action-btn {
@@ -65,6 +73,53 @@
       .btn-checkout:hover {
         background-color: #138496 !important;
         transform: translateY(-1px) !important;
+      }
+
+      .btn-checkin {
+        background-color: #20c997 !important;
+        color: white !important;
+      }
+
+      .btn-checkin:hover {
+        background-color: #1ea085 !important;
+        transform: translateY(-1px) !important;
+      }
+
+      /* Enhanced table scrolling styles */
+      .table-container::-webkit-scrollbar {
+        width: 12px;
+        height: 12px;
+      }
+
+      .table-container::-webkit-scrollbar-track {
+        background: #f1f1f1;
+        border-radius: 6px;
+      }
+
+      .table-container::-webkit-scrollbar-thumb {
+        background: #ffb64a;
+        border-radius: 6px;
+        border: 2px solid #f1f1f1;
+      }
+
+      .table-container::-webkit-scrollbar-thumb:hover {
+        background: #e6a23c;
+      }
+
+      .table-container::-webkit-scrollbar-corner {
+        background: #f1f1f1;
+      }
+
+      /* Ensure table cells don't wrap text */
+      .data-table td {
+        white-space: nowrap;
+        padding: 12px 15px;
+        border-bottom: 1px solid #e9ecef;
+      }
+
+      .data-table tbody tr:hover {
+        background-color: #f8f9fa;
+        transition: background-color 0.2s ease;
       }
     </style>
   </head>
@@ -132,9 +187,9 @@
             >
               <option value="All">All Approved</option>
               <option value="Approved">Approved</option>
-              <option value="Accepted">Accepted</option>
-              <option value="Completed">Completed</option>
+              <option value="Check In">Check In</option>
               <option value="Checked-Out">Checked-Out</option>
+              <option value="Extended">Extended</option>
             </select>
           </div>
           <button
@@ -166,19 +221,43 @@
           </button>
         </div>
 
-        <div class="table-container">
-          <table class="data-table">
-            <thead>
+        <div
+          class="table-container"
+          style="
+            overflow: auto;
+            max-height: 70vh;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+          "
+        >
+          <table class="data-table" style="min-width: 1100px; width: 100%">
+            <thead
+              style="position: sticky; top: 0; background: #ffb64a; z-index: 10"
+            >
               <tr>
-                <th>Booking ID</th>
-                <th>Pet Name</th>
-                <th>Owner Name</th>
-                <th>Service Type</th>
-                <th>Room Type</th>
-                <th>Check-in Date</th>
-                <th>Duration</th>
-                <th>Status</th>
-                <th>Actions</th>
+                <th style="padding: 15px 12px; white-space: nowrap">
+                  Booking ID
+                </th>
+                <th style="padding: 15px 12px; white-space: nowrap">
+                  Pet Name
+                </th>
+                <th style="padding: 15px 12px; white-space: nowrap">
+                  Owner Name
+                </th>
+                <th style="padding: 15px 12px; white-space: nowrap">
+                  Service Type
+                </th>
+                <th style="padding: 15px 12px; white-space: nowrap">
+                  Room Type
+                </th>
+                <th style="padding: 15px 12px; white-space: nowrap">
+                  Check-in Date
+                </th>
+                <th style="padding: 15px 12px; white-space: nowrap">
+                  Duration
+                </th>
+                <th style="padding: 15px 12px; white-space: nowrap">Status</th>
+                <th style="padding: 15px 12px; white-space: nowrap">Actions</th>
               </tr>
             </thead>
             <tbody id="approvedBookingsTableBody">

@@ -114,13 +114,18 @@
         background: white;
         border-radius: 8px;
         box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-        overflow: hidden;
+        overflow: auto;
+        max-height: 70vh;
+        border: 1px solid #ddd;
+        position: relative; /* contain sticky header stacking */
+        margin-bottom: 16px; /* spacing above summary */
       }
 
       .data-table {
         margin: 0;
         border-collapse: collapse;
         width: 100%;
+        min-width: 1400px;
       }
 
       .data-table th {
@@ -128,18 +133,167 @@
         color: #fff;
         letter-spacing: 0.5px;
         padding: 15px 12px;
-        border-bottom: 2px solid #e6a43f;
+        border-bottom: 1px solid #e6a43f;
         text-align: center;
+        position: sticky;
+        top: 0;
+        z-index: 2; /* avoid overlaying outside container */
+        white-space: nowrap;
+        box-shadow: 0 2px 0 rgba(0,0,0,0.06); /* subtle separation from rows */
       }
 
       .data-table td {
-        padding: 12px;
+        padding: 12px 15px;
         border-bottom: 1px solid #f0f0f0;
         vertical-align: middle;
+        white-space: nowrap;
       }
 
       .data-table tbody tr:hover {
         background-color: #f8f9fa;
+        transition: background-color 0.2s ease;
+      }
+
+      /* Enhanced table scrolling styles */
+      .table-container::-webkit-scrollbar {
+        width: 12px;
+        height: 12px;
+      }
+
+      .table-container::-webkit-scrollbar-track {
+        background: #f1f1f1;
+        border-radius: 6px;
+      }
+
+      .table-container::-webkit-scrollbar-thumb {
+        background: #ffb64a;
+        border-radius: 6px;
+        border: 2px solid #f1f1f1;
+      }
+
+      .table-container::-webkit-scrollbar-thumb:hover {
+        background: #e6a23c;
+      }
+
+      .table-container::-webkit-scrollbar-corner {
+        background: #f1f1f1;
+      }
+
+      /* Sidebar Navigation Styles */
+      .sidebar {
+        background-color: #ffb64a;
+        width: 250px;
+        height: 100vh;
+        position: fixed;
+        left: 0;
+        top: 0;
+        padding: 20px;
+        box-sizing: border-box;
+        display: flex;
+        flex-direction: column;
+      }
+
+      .sidebar h1 {
+        color: #000;
+        font-size: 28px;
+        font-weight: bold;
+        margin: 0 0 10px 0;
+        text-align: center;
+      }
+
+      .welcome-text {
+        color: #000;
+        font-size: 14px;
+        margin: 0 0 30px 0;
+        text-align: center;
+      }
+
+      .sidebar nav {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        gap: 5px;
+      }
+
+      .sidebar nav a {
+        color: #000;
+        text-decoration: none;
+        padding: 12px 15px;
+        border-radius: 8px;
+        transition: all 0.3s ease;
+        font-weight: 500;
+      }
+
+      .sidebar nav a:hover {
+        background-color: rgba(255, 255, 255, 0.2);
+      }
+
+      .sidebar nav a.active {
+        background-color: #fff;
+        color: #000;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+      }
+
+      .nav-item {
+        position: relative;
+      }
+
+      .nav-link {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+      }
+
+      .submenu {
+        display: none;
+        margin-left: 15px;
+        margin-top: 5px;
+      }
+
+      .submenu.active {
+        display: block;
+      }
+
+      .submenu a {
+        padding: 8px 15px;
+        font-size: 14px;
+        border-radius: 6px;
+      }
+
+      .submenu a.active {
+        background-color: #fff;
+        color: #000;
+      }
+
+      .logout {
+        color: #000;
+        text-decoration: none;
+        padding: 12px 15px;
+        border-radius: 8px;
+        transition: all 0.3s ease;
+        font-weight: 500;
+        margin-top: auto;
+        text-align: center;
+        background-color: rgba(255, 255, 255, 0.1);
+      }
+
+      .logout:hover {
+        background-color: rgba(255, 255, 255, 0.2);
+      }
+
+      /* Layout: ensure content never sits under the fixed sidebar */
+      .dashboard-container {
+        display: flex;
+        min-height: 100vh;
+        padding-left: 250px; /* reserve space for fixed sidebar */
+        box-sizing: border-box;
+      }
+
+      .main-content {
+        padding: 20px;
+        min-height: 100vh;
+        background-color: #f5f5f5;
+        width: calc(100% - 0px); /* fill remaining space after padding */
       }
     </style>
   </head>
@@ -158,7 +312,7 @@
 
           <div class="nav-item">
             <a href="#" class="nav-link" id="reportsDropdown">Reports ▼</a>
-            <div class="submenu active" id="reportsSubmenu">
+            <div class="submenu" id="reportsSubmenu">
               <a href="booking-reports.html">Booking Reports</a>
               <a href="feeding-reports.html">Feeding Reports</a>
               <a href="sales-reports.html" class="active">Sales Reports</a>
@@ -353,23 +507,21 @@
           </div>
         </div>
 
-        <div class="table-container">
-          <table class="data-table">
-            <thead>
+        <div class="table-container" style="overflow: auto; max-height: 70vh; border: 1px solid #ddd; border-radius: 8px;">
+          <table class="data-table" style="min-width: 1400px; width: 100%;">
+            <thead style="position: sticky; top: 0; background: #ffb64a; z-index: 10;">
               <tr>
-                <th>Transaction ID</th>
-                <th>Customer Name</th>
-                <!-- Removed 'Bookings' column header -->
-                <th>Service Type</th>
-                <th>Pet Size</th>
-                <th>Amount</th>
-                <th>Down Payment</th>
-                <th>Balance</th>
-                <th>Payment Method</th>
-                <th>Date</th>
-                <th>Status</th>
-                <th>Checkout Status</th>
-                <th>Actions</th>
+                <th style="padding: 15px 12px; white-space: nowrap;">Transaction ID</th>
+                <th style="padding: 15px 12px; white-space: nowrap;">Customer Name</th>
+                <th style="padding: 15px 12px; white-space: nowrap;">Service Type</th>
+                <th style="padding: 15px 12px; white-space: nowrap;">Pet Size</th>
+                <th style="padding: 15px 12px; white-space: nowrap;">Amount</th>
+                <th style="padding: 15px 12px; white-space: nowrap;">Down Payment</th>
+                <th style="padding: 15px 12px; white-space: nowrap;">Balance</th>
+                <th style="padding: 15px 12px; white-space: nowrap;">Payment Method</th>
+                <th style="padding: 15px 12px; white-space: nowrap;">Date</th>
+                <th style="padding: 15px 12px; white-space: nowrap;">Status</th>
+                <th style="padding: 15px 12px; white-space: nowrap;">Checkout Status</th>
               </tr>
             </thead>
             <tbody id="salesTableBody">
@@ -418,10 +570,10 @@
         const reportsDropdown = document.getElementById("reportsDropdown");
         const reportsSubmenu = document.getElementById("reportsSubmenu");
 
-        // Only handle reports dropdown clicks
+        // Handle reports dropdown clicks
         reportsDropdown.addEventListener("click", function (e) {
           e.preventDefault();
-          e.stopPropagation(); // Prevent event bubbling
+          e.stopPropagation();
           reportsSubmenu.classList.toggle("active");
 
           // Change arrow direction
@@ -432,13 +584,9 @@
           }
         });
 
-        // Close submenu when clicking outside the reports section specifically
+        // Close submenu when clicking outside
         document.addEventListener("click", function (e) {
-          // Only close if clicking outside the reports dropdown area
-          if (
-            !e.target.closest("#reportsDropdown") &&
-            !e.target.closest("#reportsSubmenu")
-          ) {
+          if (!e.target.closest("#reportsDropdown") && !e.target.closest("#reportsSubmenu")) {
             reportsSubmenu.classList.remove("active");
             reportsDropdown.innerHTML = "Reports ▼";
           }

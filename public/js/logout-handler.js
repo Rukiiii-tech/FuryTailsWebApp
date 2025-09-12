@@ -22,7 +22,9 @@ export function initializeLogout() {
   const logoutButton = document.getElementById("logoutButton");
 
   if (!logoutButton) {
-    console.error("Logout button not found! Cannot initialize logout functionality.");
+    console.error(
+      "Logout button not found! Cannot initialize logout functionality."
+    );
     return;
   }
 
@@ -30,7 +32,7 @@ export function initializeLogout() {
   logoutButton.addEventListener("click", (e) => {
     e.preventDefault(); // Prevent default link behavior
     console.log("Logout button clicked. Proceeding with logout.");
-    
+
     // Direct logout without confirmation modal
     handleLogout();
   });

@@ -95,9 +95,12 @@ function calculateSalesAmounts(bookingData) {
 
   // Calculate initial balance
   let balance = totalAmount - actualDownPayment;
-  
+
   // If the booking is checked out, the balance should be 0 (fully paid)
-  if (bookingData.status === "Checked-Out" || bookingData.status === "Completed") {
+  if (
+    bookingData.status === "Checked-Out" ||
+    bookingData.status === "Completed"
+  ) {
     balance = 0;
   }
 
@@ -107,24 +110,27 @@ function calculateSalesAmounts(bookingData) {
 // Load sales data from 'bookings' collection (filtered for processed statuses)
 async function loadSalesData() {
   try {
-    // Adjusted colspan to 12 since we added 'Checkout Status' column
+    // Adjusted colspan to 11 since 'Actions' column is removed
     salesTableBody.innerHTML = `
       <tr>
-        <td colspan="12" style="text-align: center; padding: 20px;">
+        <td colspan="11" style="text-align: center; padding: 20px;">
           Loading transaction data...
         </td>
       </tr>
     `;
 
-    console.log(
-      "Fetching transaction data from bookings collection..."
-    );
+    console.log("Fetching transaction data from bookings collection...");
 
     const bookingsRef = collection(db, "bookings");
     // Query for bookings with 'Approved', 'Rejected', 'Completed', 'Checked-Out' status
     const q = query(
       bookingsRef,
-      where("status", "in", ["Approved", "Rejected", "Completed", "Checked-Out"]),
+      where("status", "in", [
+        "Approved",
+        "Rejected",
+        "Completed",
+        "Checked-Out",
+      ]),
       orderBy("timestamp", "desc") // Order by timestamp for chronological reports
     );
     const querySnapshot = await getDocs(q);
@@ -172,15 +178,17 @@ async function loadSalesData() {
       );
 
       // Determine checkout status
-      const isCheckedOut = bookingData.status === "Checked-Out" || bookingData.status === "Completed";
+      const isCheckedOut =
+        bookingData.status === "Checked-Out" ||
+        bookingData.status === "Completed";
       const checkoutStatus = isCheckedOut ? "Checked Out" : "Not Checked Out";
-      
+
       // Determine payment status - if checked out, automatically mark as "Paid"
       let paymentStatus = bookingData.paymentDetails?.paymentStatus || "Unpaid";
       if (isCheckedOut) {
         paymentStatus = "Paid"; // Override payment status for checked-out bookings
       }
-      
+
       fetchedSales.push({
         id: doc.id, // Use booking ID as transaction ID
         transactionID: doc.id, // Use booking ID as transaction ID
@@ -213,10 +221,10 @@ async function loadSalesData() {
     displaySalesData(allProcessedSalesData);
   } catch (error) {
     console.error("Error loading sales data from bookings collection:", error);
-    // Adjusted colspan to 12 since we added 'Checkout Status' column
+    // Adjusted colspan to 11 since 'Actions' column is removed
     salesTableBody.innerHTML = `
       <tr>
-        <td colspan="12" style="text-align: center; padding: 20px; color: red;">
+        <td colspan="11" style="text-align: center; padding: 20px; color: red;">
           Error loading transaction data. Please check the browser console for details (F12).
         </td>
       </tr>
@@ -240,17 +248,18 @@ function displaySalesData(salesData) {
 
   salesTableBody.innerHTML = salesData
     .map(
-      (sale) => `
+      (sale, index) => `
     <tr>
-      <td>${sale.transactionID}</td>
+      <td>${index + 1}</td>
       <td>${sale.customerName}</td>
       <td>${sale.serviceType}</td>
       <td>${sale.petSize}</td>
       <td>₱${sale.totalAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
       <td>₱${sale.downPayment.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-      <td>${sale.isCheckedOut ? 
-        '<span style="color: #28a745; font-weight: bold;">₱0.00 (Paid)</span>' : 
-        `₱${sale.balance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+      <td>${
+        sale.isCheckedOut
+          ? '<span style="color: #28a745; font-weight: bold;">₱0.00</span>'
+          : `₱${sale.balance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
       }</td>
       <td>${sale.paymentMethod}</td>
       <td>${formatDate(sale.date)}</td>
@@ -258,30 +267,15 @@ function displaySalesData(salesData) {
         <span class="status-badge status-${(sale.paymentStatus || "unpaid").toLowerCase()}">${sale.paymentStatus || "Unpaid"}</span>
       </td>
       <td>
-        <span class="status-badge ${sale.isCheckedOut ? 'status-checked-out' : 'status-not-checked-out'}">
+        <span class="status-badge ${sale.isCheckedOut ? "status-checked-out" : "status-not-checked-out"}">
           ${sale.checkoutStatus}
         </span>
-      </td>
-      <td>
-        <button class="action-btn btn-primary btn-toggle-payment" data-id="${sale.id}" data-status="${sale.paymentStatus}">
-          ${sale.paymentStatus === "Paid" ? "Mark Unpaid" : "Mark Paid"}
-        </button>
-        ${!sale.isCheckedOut ? `
-        <button class="action-btn btn-success btn-checkout" data-id="${sale.id}" style="margin-top: 5px; background: #28a745;">
-          Checkout
-        </button>
-        ` : `
-        <span class="status-badge status-checked-out" style="margin-top: 5px;">Checked Out</span>
-        `}
       </td>
     </tr>
   `
     )
     .join("");
 
-  attachPaymentButtonListeners(); // Attach listeners after rendering
-  attachCheckoutButtonListeners(); // Attach checkout button listeners
-  
   // Add summary section
   addSalesSummary(salesData);
 }
@@ -312,8 +306,8 @@ function attachCheckoutButtonListeners() {
  */
 async function handleCheckoutClick(e) {
   const bookingId = e.target.getAttribute("data-id");
-  const sale = allProcessedSalesData.find(s => s.id === bookingId);
-  
+  const sale = allProcessedSalesData.find((s) => s.id === bookingId);
+
   if (!sale) {
     alert("Sale data not found!");
     return;
@@ -367,28 +361,31 @@ async function handlePaymentToggleClick(e) {
  */
 async function updateCheckoutStatus(bookingId, newStatus) {
   try {
-    console.log(`Updating checkout status for booking ${bookingId} to ${newStatus}`);
-    
+    console.log(
+      `Updating checkout status for booking ${bookingId} to ${newStatus}`
+    );
+
     const bookingRef = doc(db, "bookings", bookingId);
-    
+
     // Update both status and payment status to "Paid" since customer is checking out
     await updateDoc(bookingRef, {
       status: newStatus,
       "paymentDetails.paymentStatus": "Paid", // Mark as paid when checking out
-      updatedAt: new Date()
+      updatedAt: new Date(),
     });
-    
+
     console.log("Checkout status and payment status updated successfully");
-    
+
     // Show success message
-    alert("Checkout confirmed successfully. The booking status has been updated to 'Checked-Out' and payment status has been marked as 'Paid'.");
-    
+    alert(
+      "Checkout confirmed successfully. The booking status has been updated to 'Checked-Out' and payment status has been marked as 'Paid'."
+    );
+
     // Refresh the sales data
     await loadSalesData();
-    
   } catch (error) {
     console.error("Error updating checkout status:", error);
-    
+
     showGenericModal(
       document.getElementById("detailsModal"),
       "Error",
@@ -442,20 +439,20 @@ function formatDate(dateString) {
 // Handle date filter change to show/hide custom date inputs
 function handleDateFilterChange() {
   const dateValue = dateFilter.value;
-  
+
   if (dateValue === "custom") {
     customDateInputs.style.display = "block";
     // Set default dates (current month)
     const now = new Date();
     const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
     const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-    
-    startDate.value = firstDay.toISOString().split('T')[0];
-    endDate.value = lastDay.toISOString().split('T')[0];
+
+    startDate.value = firstDay.toISOString().split("T")[0];
+    endDate.value = lastDay.toISOString().split("T")[0];
   } else {
     customDateInputs.style.display = "none";
   }
-  
+
   // Apply the filter
   applyFilters();
 }
@@ -480,7 +477,9 @@ function applyFilters() {
 
   // Filter by Checkout Status
   if (checkoutValue !== "All") {
-    filteredData = filteredData.filter((sale) => sale.checkoutStatus === checkoutValue);
+    filteredData = filteredData.filter(
+      (sale) => sale.checkoutStatus === checkoutValue
+    );
   }
 
   // Filter by Date Range (check-in/grooming date)
@@ -534,7 +533,7 @@ function applyFilters() {
       case "custom": // Custom date range
         const startDateValue = startDate.value;
         const endDateValue = endDate.value;
-        
+
         if (startDateValue && endDateValue) {
           filterStartDate = new Date(startDateValue);
           filterStartDate.setHours(0, 0, 0, 0); // Start of the day
@@ -833,26 +832,34 @@ window.refreshSalesReports = loadSalesData;
  */
 async function autoUpdatePaymentStatusForCheckedOutBookings(fetchedSales) {
   try {
-    const bookingsToUpdate = fetchedSales.filter(sale => 
-      sale.isCheckedOut && 
-      sale.fullBookingData.paymentDetails?.paymentStatus !== "Paid"
+    const bookingsToUpdate = fetchedSales.filter(
+      (sale) =>
+        sale.isCheckedOut &&
+        sale.fullBookingData.paymentDetails?.paymentStatus !== "Paid"
     );
 
     if (bookingsToUpdate.length > 0) {
-      console.log(`Found ${bookingsToUpdate.length} checked-out bookings that need payment status update`);
-      
+      console.log(
+        `Found ${bookingsToUpdate.length} checked-out bookings that need payment status update`
+      );
+
       for (const sale of bookingsToUpdate) {
         try {
           const bookingRef = doc(db, "bookings", sale.id);
           await updateDoc(bookingRef, {
-            "paymentDetails.paymentStatus": "Paid"
+            "paymentDetails.paymentStatus": "Paid",
           });
-          console.log(`Updated payment status to "Paid" for booking ${sale.id}`);
+          console.log(
+            `Updated payment status to "Paid" for booking ${sale.id}`
+          );
         } catch (error) {
-          console.error(`Failed to update payment status for booking ${sale.id}:`, error);
+          console.error(
+            `Failed to update payment status for booking ${sale.id}:`,
+            error
+          );
         }
       }
-      
+
       console.log("Auto-update of payment status completed");
     }
   } catch (error) {
@@ -866,18 +873,28 @@ async function autoUpdatePaymentStatusForCheckedOutBookings(fetchedSales) {
  */
 function addSalesSummary(salesData) {
   // Calculate totals
-  const totalRevenue = salesData.reduce((sum, sale) => sum + sale.totalAmount, 0);
-  const totalDownPayments = salesData.reduce((sum, sale) => sum + sale.downPayment, 0);
+  const totalRevenue = salesData.reduce(
+    (sum, sale) => sum + sale.totalAmount,
+    0
+  );
+  const totalDownPayments = salesData.reduce(
+    (sum, sale) => sum + sale.downPayment,
+    0
+  );
   const totalBalances = salesData.reduce((sum, sale) => sum + sale.balance, 0);
   const totalCollected = totalDownPayments + (totalRevenue - totalBalances);
   const totalOutstanding = totalBalances;
-  
+
   // Count bookings by status
-  const checkedOutCount = salesData.filter(sale => sale.isCheckedOut).length;
-  const pendingCount = salesData.filter(sale => !sale.isCheckedOut).length;
-  const paidCount = salesData.filter(sale => sale.paymentStatus === "Paid").length;
-  const unpaidCount = salesData.filter(sale => sale.paymentStatus === "Unpaid").length;
-  
+  const checkedOutCount = salesData.filter((sale) => sale.isCheckedOut).length;
+  const pendingCount = salesData.filter((sale) => !sale.isCheckedOut).length;
+  const paidCount = salesData.filter(
+    (sale) => sale.paymentStatus === "Paid"
+  ).length;
+  const unpaidCount = salesData.filter(
+    (sale) => sale.paymentStatus === "Unpaid"
+  ).length;
+
   // Create summary HTML
   const summaryHTML = `
     <div style="margin-top: 30px; padding: 20px; background: #f8f9fa; border-radius: 8px; border: 1px solid #e9ecef;">
@@ -934,17 +951,17 @@ function addSalesSummary(salesData) {
       </div>
     </div>
   `;
-  
+
   // Add summary to the page
-  const tableContainer = document.querySelector('.table-container');
+  const tableContainer = document.querySelector(".table-container");
   if (tableContainer) {
     // Remove existing summary if any
     const existingSummary = tableContainer.nextElementSibling;
-    if (existingSummary && existingSummary.style.marginTop === '30px') {
+    if (existingSummary && existingSummary.style.marginTop === "30px") {
       existingSummary.remove();
     }
-    
+
     // Insert summary after table
-    tableContainer.insertAdjacentHTML('afterend', summaryHTML);
+    tableContainer.insertAdjacentHTML("afterend", summaryHTML);
   }
 }

@@ -9,20 +9,20 @@ export function createBarChart(containerId, data, options = {}) {
   if (!container) return;
 
   const {
-    title = 'Chart',
-    xLabel = 'X Axis',
-    yLabel = 'Y Axis',
-    barColor = '#ffb64a',
-    barHoverColor = '#e6a43f',
+    title = "Chart",
+    xLabel = "X Axis",
+    yLabel = "Y Axis",
+    barColor = "#ffb64a",
+    barHoverColor = "#e6a43f",
     height = 300,
-    width = '100%'
+    width = "100%",
   } = options;
 
   // Clear container
-  container.innerHTML = '';
+  container.innerHTML = "";
 
   // Create chart wrapper
-  const chartWrapper = document.createElement('div');
+  const chartWrapper = document.createElement("div");
   chartWrapper.style.cssText = `
     width: ${width};
     height: ${height}px;
@@ -34,7 +34,7 @@ export function createBarChart(containerId, data, options = {}) {
   `;
 
   // Create title
-  const titleElement = document.createElement('h4');
+  const titleElement = document.createElement("h4");
   titleElement.textContent = title;
   titleElement.style.cssText = `
     margin: 0 0 20px 0;
@@ -44,7 +44,7 @@ export function createBarChart(containerId, data, options = {}) {
   `;
 
   // Create chart area
-  const chartArea = document.createElement('div');
+  const chartArea = document.createElement("div");
   chartArea.style.cssText = `
     position: relative;
     height: calc(100% - 80px);
@@ -58,12 +58,12 @@ export function createBarChart(containerId, data, options = {}) {
   `;
 
   // Find max value for scaling
-  const maxValue = Math.max(...data.map(d => d.value));
-  const minValue = Math.min(...data.map(d => d.value));
+  const maxValue = Math.max(...data.map((d) => d.value));
+  const minValue = Math.min(...data.map((d) => d.value));
 
   // Create bars
   data.forEach((item, index) => {
-    const barContainer = document.createElement('div');
+    const barContainer = document.createElement("div");
     barContainer.style.cssText = `
       display: flex;
       flex-direction: column;
@@ -73,9 +73,12 @@ export function createBarChart(containerId, data, options = {}) {
       position: relative;
     `;
 
-    const bar = document.createElement('div');
-    const barHeight = maxValue > 0 ? ((item.value - minValue) / (maxValue - minValue)) * 100 : 0;
-    
+    const bar = document.createElement("div");
+    const barHeight =
+      maxValue > 0
+        ? ((item.value - minValue) / (maxValue - minValue)) * 100
+        : 0;
+
     bar.style.cssText = `
       width: 100%;
       height: ${Math.max(barHeight, 5)}%;
@@ -87,18 +90,18 @@ export function createBarChart(containerId, data, options = {}) {
     `;
 
     // Add hover effect
-    bar.addEventListener('mouseenter', () => {
+    bar.addEventListener("mouseenter", () => {
       bar.style.background = barHoverColor;
-      bar.style.transform = 'scale(1.05)';
+      bar.style.transform = "scale(1.05)";
     });
 
-    bar.addEventListener('mouseleave', () => {
+    bar.addEventListener("mouseleave", () => {
       bar.style.background = barColor;
-      bar.style.transform = 'scale(1)';
+      bar.style.transform = "scale(1)";
     });
 
     // Add value label
-    const valueLabel = document.createElement('div');
+    const valueLabel = document.createElement("div");
     valueLabel.textContent = formatCurrency(item.value);
     valueLabel.style.cssText = `
       position: absolute;
@@ -116,16 +119,16 @@ export function createBarChart(containerId, data, options = {}) {
       pointer-events: none;
     `;
 
-    bar.addEventListener('mouseenter', () => {
-      valueLabel.style.opacity = '1';
+    bar.addEventListener("mouseenter", () => {
+      valueLabel.style.opacity = "1";
     });
 
-    bar.addEventListener('mouseleave', () => {
-      valueLabel.style.opacity = '0';
+    bar.addEventListener("mouseleave", () => {
+      valueLabel.style.opacity = "0";
     });
 
     // Add x-axis label
-    const xLabelElement = document.createElement('div');
+    const xLabelElement = document.createElement("div");
     xLabelElement.textContent = item.label;
     xLabelElement.style.cssText = `
       margin-top: 10px;
@@ -143,7 +146,7 @@ export function createBarChart(containerId, data, options = {}) {
   });
 
   // Add y-axis labels
-  const yAxisLabels = document.createElement('div');
+  const yAxisLabels = document.createElement("div");
   yAxisLabels.style.cssText = `
     position: absolute;
     left: -40px;
@@ -158,7 +161,7 @@ export function createBarChart(containerId, data, options = {}) {
 
   const steps = 5;
   for (let i = 0; i <= steps; i++) {
-    const label = document.createElement('div');
+    const label = document.createElement("div");
     const value = minValue + (maxValue - minValue) * (i / steps);
     label.textContent = formatCurrency(value);
     label.style.cssText = `
@@ -183,20 +186,20 @@ export function createLineChart(containerId, data, options = {}) {
   if (!container) return;
 
   const {
-    title = 'Line Chart',
-    xLabel = 'X Axis',
-    yLabel = 'Y Axis',
-    lineColor = '#ffb64a',
-    pointColor = '#ffb64a',
+    title = "Line Chart",
+    xLabel = "X Axis",
+    yLabel = "Y Axis",
+    lineColor = "#ffb64a",
+    pointColor = "#ffb64a",
     height = 300,
-    width = '100%'
+    width = "100%",
   } = options;
 
   // Clear container
-  container.innerHTML = '';
+  container.innerHTML = "";
 
   // Create chart wrapper
-  const chartWrapper = document.createElement('div');
+  const chartWrapper = document.createElement("div");
   chartWrapper.style.cssText = `
     width: ${width};
     height: ${height}px;
@@ -208,7 +211,7 @@ export function createLineChart(containerId, data, options = {}) {
   `;
 
   // Create title
-  const titleElement = document.createElement('h4');
+  const titleElement = document.createElement("h4");
   titleElement.textContent = title;
   titleElement.style.cssText = `
     margin: 0 0 20px 0;
@@ -218,32 +221,37 @@ export function createLineChart(containerId, data, options = {}) {
   `;
 
   // Create SVG chart
-  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-  svg.setAttribute('width', '100%');
-  svg.setAttribute('height', 'calc(100% - 40px)');
+  const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  svg.setAttribute("width", "100%");
+  svg.setAttribute("height", "calc(100% - 40px)");
   svg.style.cssText = `
     border-bottom: 2px solid #e9ecef;
     border-left: 2px solid #e9ecef;
   `;
 
   // Find max and min values
-  const maxValue = Math.max(...data.map(d => d.value));
-  const minValue = Math.min(...data.map(d => d.value));
+  const maxValue = Math.max(...data.map((d) => d.value));
+  const minValue = Math.min(...data.map((d) => d.value));
   const range = maxValue - minValue;
 
   // Create line path
-  const points = data.map((item, index) => {
-    const x = (index / (data.length - 1)) * 100;
-    const y = range > 0 ? 100 - ((item.value - minValue) / range) * 100 : 50;
-    return `${x},${y}`;
-  }).join(' ');
+  const points = data
+    .map((item, index) => {
+      const x = (index / (data.length - 1)) * 100;
+      const y = range > 0 ? 100 - ((item.value - minValue) / range) * 100 : 50;
+      return `${x},${y}`;
+    })
+    .join(" ");
 
   // Create line
-  const line = document.createElementNS('http://www.w3.org/2000/svg', 'polyline');
-  line.setAttribute('points', points);
-  line.setAttribute('fill', 'none');
-  line.setAttribute('stroke', lineColor);
-  line.setAttribute('stroke-width', '3');
+  const line = document.createElementNS(
+    "http://www.w3.org/2000/svg",
+    "polyline"
+  );
+  line.setAttribute("points", points);
+  line.setAttribute("fill", "none");
+  line.setAttribute("stroke", lineColor);
+  line.setAttribute("stroke-width", "3");
   line.style.cssText = `
     transition: all 0.3s ease;
   `;
@@ -253,25 +261,28 @@ export function createLineChart(containerId, data, options = {}) {
     const x = (index / (data.length - 1)) * 100;
     const y = range > 0 ? 100 - ((item.value - minValue) / range) * 100 : 50;
 
-    const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
-    circle.setAttribute('cx', x + '%');
-    circle.setAttribute('cy', y + '%');
-    circle.setAttribute('r', '4');
-    circle.setAttribute('fill', pointColor);
+    const circle = document.createElementNS(
+      "http://www.w3.org/2000/svg",
+      "circle"
+    );
+    circle.setAttribute("cx", x + "%");
+    circle.setAttribute("cy", y + "%");
+    circle.setAttribute("r", "4");
+    circle.setAttribute("fill", pointColor);
     circle.style.cssText = `
       cursor: pointer;
       transition: all 0.3s ease;
     `;
 
     // Add hover effect
-    circle.addEventListener('mouseenter', () => {
-      circle.setAttribute('r', '6');
-      circle.setAttribute('fill', '#e6a43f');
+    circle.addEventListener("mouseenter", () => {
+      circle.setAttribute("r", "6");
+      circle.setAttribute("fill", "#e6a43f");
     });
 
-    circle.addEventListener('mouseleave', () => {
-      circle.setAttribute('r', '4');
-      circle.setAttribute('fill', pointColor);
+    circle.addEventListener("mouseleave", () => {
+      circle.setAttribute("r", "4");
+      circle.setAttribute("fill", pointColor);
     });
 
     svg.appendChild(circle);
@@ -280,12 +291,15 @@ export function createLineChart(containerId, data, options = {}) {
   // Add x-axis labels
   data.forEach((item, index) => {
     const x = (index / (data.length - 1)) * 100;
-    const label = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-    label.setAttribute('x', x + '%');
-    label.setAttribute('y', '105%');
-    label.setAttribute('text-anchor', 'middle');
-    label.setAttribute('font-size', '12');
-    label.setAttribute('fill', '#666');
+    const label = document.createElementNS(
+      "http://www.w3.org/2000/svg",
+      "text"
+    );
+    label.setAttribute("x", x + "%");
+    label.setAttribute("y", "105%");
+    label.setAttribute("text-anchor", "middle");
+    label.setAttribute("font-size", "12");
+    label.setAttribute("fill", "#666");
     label.textContent = item.label;
     svg.appendChild(label);
   });
@@ -295,14 +309,17 @@ export function createLineChart(containerId, data, options = {}) {
   for (let i = 0; i <= steps; i++) {
     const y = (i / steps) * 100;
     const value = minValue + range * (1 - i / steps);
-    
-    const label = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-    label.setAttribute('x', '-5%');
-    label.setAttribute('y', y + '%');
-    label.setAttribute('text-anchor', 'end');
-    label.setAttribute('dominant-baseline', 'middle');
-    label.setAttribute('font-size', '12');
-    label.setAttribute('fill', '#666');
+
+    const label = document.createElementNS(
+      "http://www.w3.org/2000/svg",
+      "text"
+    );
+    label.setAttribute("x", "-5%");
+    label.setAttribute("y", y + "%");
+    label.setAttribute("text-anchor", "end");
+    label.setAttribute("dominant-baseline", "middle");
+    label.setAttribute("font-size", "12");
+    label.setAttribute("fill", "#666");
     label.textContent = formatCurrency(value);
     svg.appendChild(label);
   }
@@ -322,17 +339,13 @@ export function createPieChart(containerId, data, options = {}) {
   const container = document.getElementById(containerId);
   if (!container) return;
 
-  const {
-    title = 'Pie Chart',
-    height = 300,
-    width = '100%'
-  } = options;
+  const { title = "Pie Chart", height = 300, width = "100%" } = options;
 
   // Clear container
-  container.innerHTML = '';
+  container.innerHTML = "";
 
   // Create chart wrapper
-  const chartWrapper = document.createElement('div');
+  const chartWrapper = document.createElement("div");
   chartWrapper.style.cssText = `
     width: ${width};
     height: ${height}px;
@@ -344,7 +357,7 @@ export function createPieChart(containerId, data, options = {}) {
   `;
 
   // Create title
-  const titleElement = document.createElement('h4');
+  const titleElement = document.createElement("h4");
   titleElement.textContent = title;
   titleElement.style.cssText = `
     margin: 0 0 20px 0;
@@ -354,7 +367,7 @@ export function createPieChart(containerId, data, options = {}) {
   `;
 
   // Create chart area
-  const chartArea = document.createElement('div');
+  const chartArea = document.createElement("div");
   chartArea.style.cssText = `
     display: flex;
     align-items: center;
@@ -364,19 +377,22 @@ export function createPieChart(containerId, data, options = {}) {
   `;
 
   // Create pie chart
-  const pieChart = document.createElement('div');
+  const pieChart = document.createElement("div");
   pieChart.style.cssText = `
     width: 200px;
     height: 200px;
     border-radius: 50%;
     position: relative;
-    background: conic-gradient(${data.map((item, index) => 
-      `${item.color} ${index === 0 ? 0 : data.slice(0, index).reduce((sum, d) => sum + d.percentage, 0)}% ${data.slice(0, index + 1).reduce((sum, d) => sum + d.percentage, 0)}%`
-    ).join(', ')});
+    background: conic-gradient(${data
+      .map(
+        (item, index) =>
+          `${item.color} ${index === 0 ? 0 : data.slice(0, index).reduce((sum, d) => sum + d.percentage, 0)}% ${data.slice(0, index + 1).reduce((sum, d) => sum + d.percentage, 0)}%`
+      )
+      .join(", ")});
   `;
 
   // Create legend
-  const legend = document.createElement('div');
+  const legend = document.createElement("div");
   legend.style.cssText = `
     display: flex;
     flex-direction: column;
@@ -384,7 +400,7 @@ export function createPieChart(containerId, data, options = {}) {
   `;
 
   data.forEach((item, index) => {
-    const legendItem = document.createElement('div');
+    const legendItem = document.createElement("div");
     legendItem.style.cssText = `
       display: flex;
       align-items: center;
@@ -392,7 +408,7 @@ export function createPieChart(containerId, data, options = {}) {
       font-size: 0.9em;
     `;
 
-    const colorBox = document.createElement('div');
+    const colorBox = document.createElement("div");
     colorBox.style.cssText = `
       width: 16px;
       height: 16px;
@@ -400,7 +416,7 @@ export function createPieChart(containerId, data, options = {}) {
       border-radius: 3px;
     `;
 
-    const label = document.createElement('span');
+    const label = document.createElement("span");
     label.textContent = `${item.label}: ${item.percentage}%`;
 
     legendItem.appendChild(colorBox);
@@ -420,10 +436,10 @@ export function createPieChart(containerId, data, options = {}) {
  * Formats currency values
  */
 function formatCurrency(value) {
-  if (typeof value !== 'number') return '₱0.00';
-  return `₱${value.toLocaleString(undefined, { 
-    minimumFractionDigits: 2, 
-    maximumFractionDigits: 2 
+  if (typeof value !== "number") return "₱0.00";
+  return `₱${value.toLocaleString(undefined, {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
   })}`;
 }
 
@@ -435,17 +451,17 @@ export function createGaugeChart(containerId, value, maxValue, options = {}) {
   if (!container) return;
 
   const {
-    title = 'Gauge Chart',
+    title = "Gauge Chart",
     height = 200,
-    width = '100%',
-    color = '#ffb64a'
+    width = "100%",
+    color = "#ffb64a",
   } = options;
 
   // Clear container
-  container.innerHTML = '';
+  container.innerHTML = "";
 
   // Create chart wrapper
-  const chartWrapper = document.createElement('div');
+  const chartWrapper = document.createElement("div");
   chartWrapper.style.cssText = `
     width: ${width};
     height: ${height}px;
@@ -458,7 +474,7 @@ export function createGaugeChart(containerId, value, maxValue, options = {}) {
   `;
 
   // Create title
-  const titleElement = document.createElement('h4');
+  const titleElement = document.createElement("h4");
   titleElement.textContent = title;
   titleElement.style.cssText = `
     margin: 0 0 20px 0;
@@ -467,7 +483,7 @@ export function createGaugeChart(containerId, value, maxValue, options = {}) {
   `;
 
   // Create gauge
-  const gauge = document.createElement('div');
+  const gauge = document.createElement("div");
   gauge.style.cssText = `
     width: 120px;
     height: 60px;
@@ -478,7 +494,7 @@ export function createGaugeChart(containerId, value, maxValue, options = {}) {
   `;
 
   // Create gauge needle
-  const needle = document.createElement('div');
+  const needle = document.createElement("div");
   const rotation = (value / maxValue) * 180;
   needle.style.cssText = `
     position: absolute;
@@ -494,7 +510,7 @@ export function createGaugeChart(containerId, value, maxValue, options = {}) {
   `;
 
   // Create value display
-  const valueDisplay = document.createElement('div');
+  const valueDisplay = document.createElement("div");
   valueDisplay.style.cssText = `
     font-size: 1.5em;
     font-weight: bold;
@@ -504,7 +520,7 @@ export function createGaugeChart(containerId, value, maxValue, options = {}) {
   valueDisplay.textContent = formatCurrency(value);
 
   // Create max value display
-  const maxValueDisplay = document.createElement('div');
+  const maxValueDisplay = document.createElement("div");
   maxValueDisplay.style.cssText = `
     font-size: 0.9em;
     color: #666;
@@ -519,8 +535,3 @@ export function createGaugeChart(containerId, value, maxValue, options = {}) {
   chartWrapper.appendChild(maxValueDisplay);
   container.appendChild(chartWrapper);
 }
-
-
-
-
-

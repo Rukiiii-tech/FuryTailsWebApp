@@ -51,11 +51,7 @@
   flex-shrink: 0;
 }
 
-/* Specific header style for Pet Details Modal (if different primary color needed) */
-.modal-header-pet {
-  background: #6c757d;
-  border-color: #6c757d;
-}
+
 
 /* Modal Close Button - Common Styling */
 .close-modal {

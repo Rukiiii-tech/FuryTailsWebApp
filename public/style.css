@@ -1,11 +1,40 @@
 /* Make all text on the website black */
-body, h1, h2, h3, h4, h5, h6, p, label, span, div, a, th, td, input, select, button, li, ul, ol, strong, em, b, i {
+body,
+h1,
+h2,
+h3,
+h4,
+h5,
+h6,
+p,
+label,
+span,
+div,
+a,
+th,
+td,
+input,
+select,
+button,
+li,
+ul,
+ol,
+strong,
+em,
+b,
+i {
   color: #000 !important;
 }
 
 /* Make all button text white */
-button, .action-btn, .btn-primary, .btn-secondary, input[type=button], input[type=submit], input[type=reset] {
-  color: #fff !important;
+button,
+.action-btn,
+.btn-primary,
+.btn-secondary,
+input[type="button"],
+input[type="submit"],
+input[type="reset"] {
+  color: black !important;
 }
 
 /* General Body and Container Styles */
@@ -135,7 +164,7 @@ form {
 .register-btn {
   width: 100%;
   padding: 14px;
-  background: #ffffff;
+
   color: #ffb64a;
   border: none;
   border-radius: 8px;
@@ -245,7 +274,6 @@ form {
   font-weight: 500;
   font-size: 15px;
   border: 1px solid transparent;
-
 }
 
 .nav-link:hover {
@@ -309,7 +337,7 @@ form {
 }
 
 .submenu a.active::before {
-  content: '';
+  content: "";
   position: absolute;
   left: 0;
   top: 0;

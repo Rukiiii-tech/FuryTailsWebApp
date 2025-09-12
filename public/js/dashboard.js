@@ -61,7 +61,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     null
   );
   setupRealtimeCountListener("bookings", "totalBookedCount", null);
-  
+
   // ===================== Weekly Sales (This Week) =====================
   const weeklySalesElement = document.getElementById("weeklySalesAmount");
   if (weeklySalesElement) {
@@ -97,7 +97,14 @@ document.addEventListener("DOMContentLoaded", async () => {
     };
 
     const calculateSalesAmount = (bookingData) => {
-      const sizePrices = { Small: 500, Medium: 600, Large: 700, XL: 800, XXL: 900, "N/A": 0 };
+      const sizePrices = {
+        Small: 500,
+        Medium: 600,
+        Large: 700,
+        XL: 800,
+        XXL: 900,
+        "N/A": 0,
+      };
 
       let totalAmount = 0;
       const petWeight = bookingData?.petInformation?.petWeight;
@@ -105,12 +112,15 @@ document.addEventListener("DOMContentLoaded", async () => {
 
       if (bookingData.serviceType === "Boarding") {
         const dailyPrice = sizePrices[petSize] || 0;
-        const checkInDateStr = bookingData.boardingDetails?.checkInDate || bookingData.date;
+        const checkInDateStr =
+          bookingData.boardingDetails?.checkInDate || bookingData.date;
         const checkOutDateStr = bookingData.boardingDetails?.checkOutDate;
         if (checkInDateStr && checkOutDateStr) {
           const checkInDate = new Date(checkInDateStr);
           const checkOutDate = new Date(checkOutDateStr);
-          const diffTime = Math.abs(checkOutDate.getTime() - checkInDate.getTime());
+          const diffTime = Math.abs(
+            checkOutDate.getTime() - checkInDate.getTime()
+          );
           const daysDiff = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
           totalAmount = dailyPrice * Math.max(1, daysDiff); // Ensure at least 1 day
         }
@@ -122,13 +132,22 @@ document.addEventListener("DOMContentLoaded", async () => {
     };
 
     const getAccurateSaleDate = (bookingData) => {
-      if (bookingData?.serviceType === "Boarding" && bookingData?.boardingDetails?.checkInDate) {
+      if (
+        bookingData?.serviceType === "Boarding" &&
+        bookingData?.boardingDetails?.checkInDate
+      ) {
         return new Date(bookingData.boardingDetails.checkInDate);
       }
-      if (bookingData?.serviceType === "Grooming" && bookingData?.groomingDetails?.groomingCheckInDate) {
+      if (
+        bookingData?.serviceType === "Grooming" &&
+        bookingData?.groomingDetails?.groomingCheckInDate
+      ) {
         return new Date(bookingData.groomingDetails.groomingCheckInDate);
       }
-      if (bookingData?.timestamp && typeof bookingData.timestamp.toDate === "function") {
+      if (
+        bookingData?.timestamp &&
+        typeof bookingData.timestamp.toDate === "function"
+      ) {
         return bookingData.timestamp.toDate();
       }
       if (bookingData?.date) {

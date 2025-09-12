@@ -14,11 +14,11 @@
 .stat-card {
   padding: 14px;
   border-radius: 12px;
-  color: white;
   min-height: 90px;
   display: flex;
   flex-direction: column;
   justify-content: center;
+  position: relative;
   box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
   transition:
     transform 0.2s ease,
@@ -42,13 +42,25 @@
   font-weight: bold;
 }
 
+/* Stat card logo/icon */
+.stat-icon {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  width: 36px;
+  height: 36px;
+  object-fit: contain;
+  opacity: 0.95;
+  pointer-events: none;
+}
+
 /* Stat Card Colors */
 .stat-users {
-  background-color: #2ecc71; /* Success Green */
+  background-color: #3bc3ec; /* Success Green */
 }
 
 .stat-pending {
-  background-color: #e74c3c; /* Danger Red */
+  background-color: rgb(0, 255, 157); /* Danger Red */
 }
 
 .stat-feeding {
@@ -61,6 +73,10 @@
 
 .stat-booked {
   background-color: #bdc3c7; /* Light Grey/Blue */
+}
+
+.stat-weekly-sales {
+  background-color: #b2ccdd; /* Light Grey/Blue */
 }
 
 /* Chart Container (if any dashboard chart is used) */

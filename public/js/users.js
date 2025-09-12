@@ -8,7 +8,10 @@ import {
   doc,
   getDoc,
 } from "./firebase-config.js";
-import { showGenericModal, initializeModalCloseListeners } from "./modal_handler.js";
+import {
+  showGenericModal,
+  initializeModalCloseListeners,
+} from "./modal_handler.js";
 
 document.addEventListener("DOMContentLoaded", () => {
   console.log("DOM Content Loaded for users.html");
@@ -48,7 +51,7 @@ document.addEventListener("DOMContentLoaded", () => {
         user = userDocSnap.data();
         user.id = userDocSnap.id;
         console.log("Fetched User Details:", user);
-        
+
         // Format user details for display
         const userDetailsHtml = `
           <div class="user-details">
@@ -146,7 +149,7 @@ document.addEventListener("DOMContentLoaded", () => {
         const userData = documentSnapshot.data();
         const userId = documentSnapshot.id;
         // Only show users with role 'user'
-        if (userData.role !== 'user') {
+        if (userData.role !== "user") {
           return;
         }
         console.log("Processing user document ID:", userId, "Data:", userData);
@@ -176,7 +179,8 @@ document.addEventListener("DOMContentLoaded", () => {
         // Add status cell
         const statusCell = newRow.insertCell();
         const statusSpan = document.createElement("span");
-        statusSpan.className = "status-badge " + (isActive ? "status-approved" : "status-rejected");
+        statusSpan.className =
+          "status-badge " + (isActive ? "status-approved" : "status-rejected");
         statusSpan.textContent = isActive ? "Active" : "Inactive";
         statusCell.appendChild(statusSpan);
 
