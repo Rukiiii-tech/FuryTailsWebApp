@@ -265,7 +265,9 @@ const renderApprovedBookingsTable = async () => {
 
       // Format duration
       let duration = "N/A";
-      if (booking.duration) {
+      if (booking.boardingDetails?.hourlyExtension) {
+        duration = `${booking.boardingDetails.extensionHours} hours`;
+      } else if (booking.duration) {
         duration = `${booking.duration} days`;
       } else if (booking.numberOfDays) {
         duration = `${booking.numberOfDays} days`;
@@ -381,17 +383,17 @@ const renderApprovedBookingsTable = async () => {
  */
 function attachActionButtonListeners() {
   // Remove existing listeners to prevent duplicates
-  document.querySelectorAll(".btn-view").forEach(btn => {
+  document.querySelectorAll(".btn-view").forEach((btn) => {
     btn.removeEventListener("click", handleViewClick);
     btn.addEventListener("click", handleViewClick);
   });
-  
-  document.querySelectorAll(".btn-checkin").forEach(btn => {
+
+  document.querySelectorAll(".btn-checkin").forEach((btn) => {
     btn.removeEventListener("click", handleCheckinClick);
     btn.addEventListener("click", handleCheckinClick);
   });
-  
-  document.querySelectorAll(".btn-checkout").forEach(btn => {
+
+  document.querySelectorAll(".btn-checkout").forEach((btn) => {
     btn.removeEventListener("click", handleCheckoutClick);
     btn.addEventListener("click", handleCheckoutClick);
   });
@@ -457,6 +459,26 @@ window.viewApprovedBookingDetails = async function (bookingId) {
       }
     }
 
+    // Format duration
+    let duration = "N/A";
+    if (booking.boardingDetails?.hourlyExtension) {
+      duration = `${booking.boardingDetails.extensionHours} hours`;
+    } else if (booking.duration) {
+      duration = `${booking.duration} days`;
+    } else if (booking.numberOfDays) {
+      duration = `${booking.numberOfDays} days`;
+    } else if (checkOutDate && checkInDate !== "N/A") {
+      try {
+        const checkIn = new Date(checkInDate);
+        const checkOut = new Date(checkOutDate);
+        const diffTime = Math.abs(checkOut - checkIn);
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+        duration = `${diffDays} days`;
+      } catch (e) {
+        duration = "N/A";
+      }
+    }
+
     // Get customer information using the actual field names from the database
     const petName = booking.petInformation?.petName || "N/A";
     const ownerName = booking.ownerInformation
@@ -464,11 +486,6 @@ window.viewApprovedBookingDetails = async function (bookingId) {
       : "N/A";
     const serviceType = booking.serviceType || "N/A";
     const roomType = booking.boardingDetails?.selectedRoomType || "N/A";
-    const duration = booking.duration
-      ? `${booking.duration} days`
-      : booking.numberOfDays
-        ? `${booking.numberOfDays} days`
-        : "N/A";
 
     // Create modal content with standardized design matching pending bookings
     const modalContent = `
@@ -521,7 +538,7 @@ window.viewApprovedBookingDetails = async function (bookingId) {
 
       <div class="modal-section">
         <h3>Admin Notes</h3>
-        <p>${Array.isArray(booking.adminNotes) ? booking.adminNotes.join("<br>") : (booking.adminNotes || "No notes provided.")}</p>
+        <p>${Array.isArray(booking.adminNotes) ? booking.adminNotes.join("<br>") : booking.adminNotes || "No notes provided."}</p>
       </div>
     `;
 
@@ -539,7 +556,9 @@ window.viewApprovedBookingDetails = async function (bookingId) {
       );
     } else {
       console.error("Modal elements not found!");
-      alert("Error: Modal elements not found. Please refresh the page and try again.");
+      alert(
+        "Error: Modal elements not found. Please refresh the page and try again."
+      );
     }
   } catch (error) {
     console.error("Error viewing approved booking details:", error);
@@ -726,7 +745,9 @@ window.handleCheckoutClick = async function (bookingId) {
             openExtensionModal(bookingId, booking);
           } catch (error) {
             console.error("Error opening extension modal:", error);
-            alert(`Error: ${error.message || "Unable to open extension modal"}`);
+            alert(
+              `Error: ${error.message || "Unable to open extension modal"}`
+            );
           }
         };
       }
@@ -805,10 +826,10 @@ async function handleConfirmCheckout(bookingId, booking) {
 
     // Show success message
     const isExtended = booking.status === "Extended";
-    const message = isExtended 
+    const message = isExtended
       ? "✅ Extended booking checkout confirmed successfully! The booking status has been updated to 'Checked-Out' and payment status has been marked as 'Paid'."
       : "✅ Checkout confirmed successfully! The booking status has been updated to 'Checked-Out' and payment status has been marked as 'Paid'.";
-    
+
     alert(message);
 
     // Refresh the table to reflect the changes
@@ -878,7 +899,8 @@ function openExtensionModal(bookingId, booking) {
   const modal = document.getElementById("detailsModal");
   const modalContentDiv = document.getElementById("modalBody");
 
-  const currentCheckIn = booking.boardingDetails?.checkInDate || booking.date || "";
+  const currentCheckIn =
+    booking.boardingDetails?.checkInDate || booking.date || "";
   const currentCheckOut = booking.boardingDetails?.checkOutDate || "";
 
   const content = `
@@ -943,8 +965,12 @@ function openExtensionModal(bookingId, booking) {
 
     const saveBtn = document.getElementById("saveExtensionBtn");
     const cancelBtn = document.getElementById("cancelExtensionBtn");
-    const dailyRadio = document.querySelector('input[name="extensionType"][value="daily"]');
-    const hourlyRadio = document.querySelector('input[name="extensionType"][value="hourly"]');
+    const dailyRadio = document.querySelector(
+      'input[name="extensionType"][value="daily"]'
+    );
+    const hourlyRadio = document.querySelector(
+      'input[name="extensionType"][value="hourly"]'
+    );
     const dailyExtension = document.getElementById("dailyExtension");
     const hourlyExtension = document.getElementById("hourlyExtension");
 
@@ -955,7 +981,7 @@ function openExtensionModal(bookingId, booking) {
         hourlyExtension.style.display = "none";
       };
     }
-    
+
     if (hourlyRadio) {
       hourlyRadio.onchange = () => {
         dailyExtension.style.display = "none";
@@ -978,11 +1004,17 @@ function openExtensionModal(bookingId, booking) {
     if (cancelBtn) cancelBtn.onclick = closeModal;
     if (saveBtn) {
       saveBtn.onclick = async () => {
-        const extensionType = document.querySelector('input[name="extensionType"]:checked')?.value;
-        
+        const extensionType = document.querySelector(
+          'input[name="extensionType"]:checked'
+        )?.value;
+
         if (extensionType === "daily") {
-          const newIn = /** @type {HTMLInputElement} */ (document.getElementById("extCheckIn")).value;
-          const newOut = /** @type {HTMLInputElement} */ (document.getElementById("extCheckOut")).value;
+          const newIn = /** @type {HTMLInputElement} */ (
+            document.getElementById("extCheckIn")
+          ).value;
+          const newOut = /** @type {HTMLInputElement} */ (
+            document.getElementById("extCheckOut")
+          ).value;
 
           if (!newIn || !newOut) {
             alert("Please select both new check-in and check-out dates.");
@@ -1004,8 +1036,12 @@ function openExtensionModal(bookingId, booking) {
             alert(`Failed to save extension: ${e.message || e}`);
           }
         } else if (extensionType === "hourly") {
-          const hours = /** @type {HTMLInputElement} */ (document.getElementById("extHours")).value;
-          const currentTime = /** @type {HTMLInputElement} */ (document.getElementById("currentCheckOutTime")).value;
+          const hours = /** @type {HTMLInputElement} */ (
+            document.getElementById("extHours")
+          ).value;
+          const currentTime = /** @type {HTMLInputElement} */ (
+            document.getElementById("currentCheckOutTime")
+          ).value;
 
           if (!hours || !currentTime) {
             alert("Please enter extension hours and current check-out time.");
@@ -1019,7 +1055,12 @@ function openExtensionModal(bookingId, booking) {
           }
 
           try {
-            await saveHourlyExtension(bookingId, booking, hoursNum, currentTime);
+            await saveHourlyExtension(
+              bookingId,
+              booking,
+              hoursNum,
+              currentTime
+            );
             closeModal();
             setTimeout(() => {
               window.location.reload();
@@ -1039,7 +1080,13 @@ function openExtensionModal(bookingId, booking) {
 /**
  * Saves extension to Firestore: update dates, mark status Extended, keep financials paid if applicable
  */
-async function saveExtension(bookingId, booking, newCheckInISO, newCheckOutISO, extensionType = "daily") {
+async function saveExtension(
+  bookingId,
+  booking,
+  newCheckInISO,
+  newCheckOutISO,
+  extensionType = "daily"
+) {
   try {
     console.log("Saving extension for booking:", bookingId);
     console.log("New check-in:", newCheckInISO);
@@ -1065,10 +1112,10 @@ async function saveExtension(bookingId, booking, newCheckInISO, newCheckOutISO, 
     console.log("Extension saved successfully");
 
     alert("✅ Extension saved. Booking marked as Extended.");
-    
+
     // Refresh the table to show updated status
     await renderApprovedBookingsTable();
-    
+
     // Also refresh sales reports if available
     if (window.refreshSalesReports) {
       window.refreshSalesReports();
@@ -1093,11 +1140,13 @@ async function saveHourlyExtension(bookingId, booking, hours, currentTime) {
 
     // Calculate new check-out time
     const currentDate = new Date();
-    const [hoursStr, minutesStr] = currentTime.split(':');
+    const [hoursStr, minutesStr] = currentTime.split(":");
     currentDate.setHours(parseInt(hoursStr), parseInt(minutesStr), 0, 0);
-    
-    const newCheckOutTime = new Date(currentDate.getTime() + (hours * 60 * 60 * 1000));
-    const newCheckOutISO = newCheckOutTime.toISOString().split('T')[0];
+
+    const newCheckOutTime = new Date(
+      currentDate.getTime() + hours * 60 * 60 * 1000
+    );
+    const newCheckOutISO = newCheckOutTime.toISOString().split("T")[0];
     const newCheckOutTimeStr = newCheckOutTime.toTimeString().slice(0, 5);
 
     const updatedBoarding = {
@@ -1120,11 +1169,13 @@ async function saveHourlyExtension(bookingId, booking, hours, currentTime) {
     await updateDoc(bookingRef, updateData);
     console.log("Hourly extension saved successfully");
 
-    alert(`✅ Hourly extension saved. Booking extended by ${hours} hour(s). New check-out time: ${newCheckOutTimeStr}`);
-    
+    alert(
+      `✅ Hourly extension saved. Booking extended by ${hours} hour(s). New check-out time: ${newCheckOutTimeStr}`
+    );
+
     // Refresh the table to show updated status
     await renderApprovedBookingsTable();
-    
+
     // Also refresh sales reports if available
     if (window.refreshSalesReports) {
       window.refreshSalesReports();
@@ -1135,7 +1186,6 @@ async function saveHourlyExtension(bookingId, booking, hours, currentTime) {
     throw error;
   }
 }
-
 
 /**
  * Calculates the total amount, down payment, and balance for a booking.

@@ -5,12 +5,12 @@ import {
   getDocs,
   query,
   orderBy,
-  where, // Import 'where' for filtering by status
+  where,
   doc,
-  updateDoc, // Import updateDoc for updating payment status
+  updateDoc,
 } from "./firebase-config.js";
 
-import { showGenericModal } from "./modal_handler.js"; // Import modal handler for confirmations
+import { showGenericModal } from "./modal_handler.js";
 
 // Global variable to store all fetched and processed sales data for filtering
 let allProcessedSalesData = [];
@@ -37,9 +37,9 @@ function getPetSizeCategory(weightKg) {
   if (weightKg < 10) return "Small";
   if (weightKg >= 11 && weightKg <= 26) return "Medium";
   if (weightKg >= 27 && weightKg <= 34) return "Large";
-  if (weightKg >= 34 && weightKg <= 38) return "XL"; // Note: 34kg is inclusive for both Large and XL based on your ranges
+  if (weightKg >= 34 && weightKg <= 38) return "XL";
   if (weightKg > 38) return "XXL";
-  return "N/A"; // Fallback for weights outside defined ranges
+  return "N/A";
 }
 
 /**
@@ -59,14 +59,11 @@ function calculateSalesAmounts(bookingData) {
     Large: 700,
     XL: 800,
     XXL: 900,
-    "N/A": 0, // Default for unknown size
+    "N/A": 0,
   };
 
   if (bookingData.serviceType === "Boarding") {
-    // Base price per day depends on pet size
     let dailyPrice = sizePrices[petSize] || 0;
-
-    // Calculate total based on number of days
     const checkInDateStr =
       bookingData.boardingDetails?.checkInDate || bookingData.date;
     const checkOutDateStr = bookingData.boardingDetails?.checkOutDate;
@@ -76,27 +73,23 @@ function calculateSalesAmounts(bookingData) {
       const checkOutDate = new Date(checkOutDateStr);
       const diffTime = Math.abs(checkOutDate.getTime() - checkInDate.getTime());
       const daysDiff = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-      totalAmount = dailyPrice * Math.max(1, daysDiff); // Ensure at least 1 day
+      totalAmount = dailyPrice * Math.max(1, daysDiff);
     } else {
-      totalAmount = 0; // If dates are missing, total is 0
+      totalAmount = 0;
     }
   } else if (bookingData.serviceType === "Grooming") {
-    // Grooming price also depends on pet size
     totalAmount = sizePrices[petSize] || 0;
   }
 
-  // Get downPayment from bookingData.paymentDetails.downPaymentAmount if available, otherwise default to 0
   let actualDownPayment = parseFloat(
     bookingData.paymentDetails?.downPaymentAmount
   );
   if (isNaN(actualDownPayment)) {
-    actualDownPayment = 0; // Default to 0 if not a valid number or not provided
+    actualDownPayment = 0;
   }
 
-  // Calculate initial balance
   let balance = totalAmount - actualDownPayment;
 
-  // If the booking is checked out, the balance should be 0 (fully paid)
   if (
     bookingData.status === "Checked-Out" ||
     bookingData.status === "Completed"
@@ -107,13 +100,12 @@ function calculateSalesAmounts(bookingData) {
   return { totalAmount, downPayment: actualDownPayment, balance, petSize };
 }
 
-// Load sales data from 'bookings' collection (filtered for processed statuses)
+// Load sales data from 'bookings' collection
 async function loadSalesData() {
   try {
-    // Adjusted colspan to 11 since 'Actions' column is removed
     salesTableBody.innerHTML = `
       <tr>
-        <td colspan="11" style="text-align: center; padding: 20px;">
+        <td colspan="10" style="text-align: center; padding: 20px;">
           Loading transaction data...
         </td>
       </tr>
@@ -122,7 +114,6 @@ async function loadSalesData() {
     console.log("Fetching transaction data from bookings collection...");
 
     const bookingsRef = collection(db, "bookings");
-    // Query for bookings with 'Approved', 'Rejected', 'Completed', 'Checked-Out' status
     const q = query(
       bookingsRef,
       where("status", "in", [
@@ -131,7 +122,7 @@ async function loadSalesData() {
         "Completed",
         "Checked-Out",
       ]),
-      orderBy("timestamp", "desc") // Order by timestamp for chronological reports
+      orderBy("timestamp", "desc")
     );
     const querySnapshot = await getDocs(q);
 
@@ -141,7 +132,8 @@ async function loadSalesData() {
     );
 
     let fetchedSales = [];
-    const ownerBookingCounts = new Map(); // To store booking counts per owner
+    const ownerBookingCounts = new Map();
+    let transactionCounter = querySnapshot.size;
 
     querySnapshot.forEach((doc) => {
       const bookingData = doc.data();
@@ -152,7 +144,6 @@ async function loadSalesData() {
         ? `${bookingData.ownerInformation.firstName || ""} ${bookingData.ownerInformation.lastName || ""}`.trim()
         : "N/A";
 
-      // Determine the accurate date for the sale (check-in date)
       let accurateSaleDate = "N/A";
       if (
         bookingData.serviceType === "Boarding" &&
@@ -165,66 +156,60 @@ async function loadSalesData() {
       ) {
         accurateSaleDate = bookingData.groomingDetails.groomingCheckInDate;
       } else if (bookingData.timestamp) {
-        // Fallback to booking timestamp if specific check-in date is missing
         accurateSaleDate = new Date(
           bookingData.timestamp.toDate()
         ).toISOString();
       }
 
-      // Increment booking count for this customer
       ownerBookingCounts.set(
         customerName,
         (ownerBookingCounts.get(customerName) || 0) + 1
       );
 
-      // Determine checkout status
       const isCheckedOut =
         bookingData.status === "Checked-Out" ||
         bookingData.status === "Completed";
       const checkoutStatus = isCheckedOut ? "Checked Out" : "Not Checked Out";
 
-      // Determine payment status - if checked out, automatically mark as "Paid"
       let paymentStatus = bookingData.paymentDetails?.paymentStatus || "Unpaid";
       if (isCheckedOut) {
-        paymentStatus = "Paid"; // Override payment status for checked-out bookings
+        paymentStatus = "Paid";
       }
 
       fetchedSales.push({
-        id: doc.id, // Use booking ID as transaction ID
-        transactionID: doc.id, // Use booking ID as transaction ID
+        id: doc.id,
+        transactionID: transactionCounter,
         customerName: customerName,
         serviceType: bookingData.serviceType || "N/A",
         totalAmount: totalAmount,
         downPayment: downPayment,
         balance: balance,
-        paymentMethod: bookingData.paymentDetails?.method || "N/A", // Get payment method from booking details
-        date: accurateSaleDate, // Use the accurate check-in/grooming date
-        status: bookingData.status || "N/A", // Keep the original booking status for filtering/details
-        petSize: petSize, // Add pet size to the sale object
-        paymentStatus: paymentStatus, // Use the determined payment status
-        checkoutStatus: checkoutStatus, // NEW: Checkout status
-        isCheckedOut: isCheckedOut, // NEW: Boolean for easy filtering
-        // Store full booking data for detailed view
+        paymentMethod: bookingData.paymentDetails?.method || "N/A",
+        date: accurateSaleDate,
+        status: bookingData.status || "N/A",
+        petSize: petSize,
+        paymentStatus: paymentStatus,
+        checkoutStatus: checkoutStatus,
+        isCheckedOut: isCheckedOut,
         fullBookingData: bookingData,
       });
+
+      transactionCounter--;
     });
 
-    // After counting, add the ownerBookingCount to each sale object
     allProcessedSalesData = fetchedSales.map((sale) => ({
       ...sale,
       ownerBookingCount: ownerBookingCounts.get(sale.customerName) || 0,
     }));
 
-    // Auto-update payment status for checked-out bookings that don't have "Paid" status
     await autoUpdatePaymentStatusForCheckedOutBookings(fetchedSales);
 
     displaySalesData(allProcessedSalesData);
   } catch (error) {
     console.error("Error loading sales data from bookings collection:", error);
-    // Adjusted colspan to 11 since 'Actions' column is removed
     salesTableBody.innerHTML = `
       <tr>
-        <td colspan="11" style="text-align: center; padding: 20px; color: red;">
+        <td colspan="10" style="text-align: center; padding: 20px; color: red;">
           Error loading transaction data. Please check the browser console for details (F12).
         </td>
       </tr>
@@ -235,10 +220,9 @@ async function loadSalesData() {
 // Display sales data in table
 function displaySalesData(salesData) {
   if (salesData.length === 0) {
-    // Adjusted colspan to 10 since 'Bookings' column is removed, and 'Status' column is also removed from table
     salesTableBody.innerHTML = `
       <tr>
-        <td colspan="11" style="text-align: center; padding: 20px;">
+        <td colspan="10" style="text-align: center; padding: 20px;">
           No transaction data found.
         </td>
       </tr>
@@ -248,9 +232,9 @@ function displaySalesData(salesData) {
 
   salesTableBody.innerHTML = salesData
     .map(
-      (sale, index) => `
+      (sale) => `
     <tr>
-      <td>${index + 1}</td>
+      <td>${sale.transactionID}</td>
       <td>${sale.customerName}</td>
       <td>${sale.serviceType}</td>
       <td>${sale.petSize}</td>
@@ -258,7 +242,7 @@ function displaySalesData(salesData) {
       <td>₱${sale.downPayment.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
       <td>${
         sale.isCheckedOut
-          ? '<span style="color: #28a745; font-weight: bold;">₱0.00</span>'
+          ? '<span style="color: #28a745; font-weight: bold;">₱0.00 (Paid)</span>'
           : `₱${sale.balance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
       }</td>
       <td>${sale.paymentMethod}</td>
@@ -276,156 +260,13 @@ function displaySalesData(salesData) {
     )
     .join("");
 
-  // Add summary section
   addSalesSummary(salesData);
-}
-
-/**
- * Attaches event listeners to the "Mark Paid/Unpaid" buttons.
- */
-function attachPaymentButtonListeners() {
-  document.querySelectorAll(".btn-toggle-payment").forEach((button) => {
-    button.removeEventListener("click", handlePaymentToggleClick); // Prevent duplicate listeners
-    button.addEventListener("click", handlePaymentToggleClick);
-  });
-}
-
-/**
- * Attaches event listeners to the checkout buttons.
- */
-function attachCheckoutButtonListeners() {
-  document.querySelectorAll(".btn-checkout").forEach((button) => {
-    button.removeEventListener("click", handleCheckoutClick); // Prevent duplicate listeners
-    button.addEventListener("click", handleCheckoutClick);
-  });
-}
-
-/**
- * Handles the click event for the checkout button.
- * @param {Event} e - The click event object.
- */
-async function handleCheckoutClick(e) {
-  const bookingId = e.target.getAttribute("data-id");
-  const sale = allProcessedSalesData.find((s) => s.id === bookingId);
-
-  if (!sale) {
-    alert("Sale data not found!");
-    return;
-  }
-
-  // Use the generic modal for confirmation
-  const confirmed = await showGenericModal(
-    document.getElementById("detailsModal"),
-    `Confirm Checkout`,
-    `<p>Are you sure you want to mark this booking as <strong>Checked-Out</strong>?</p>
-     <p><strong>Customer:</strong> ${sale.customerName}</p>
-     <p><strong>Service:</strong> ${sale.serviceType}</p>
-     <p><strong>Balance Due:</strong> ₱${sale.balance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
-     <p style="color: #28a745; font-weight: bold;">Note: This will also mark the payment status as "Paid" and set the balance to ₱0.00</p>`,
-    document.getElementById("modalBody"),
-    true // show confirmation buttons
-  );
-
-  if (confirmed) {
-    await updateCheckoutStatus(bookingId, "Checked-Out");
-  }
-}
-
-/**
- * Handles the click event for the "Mark Paid/Unpaid" button.
- * @param {Event} e - The click event object.
- */
-async function handlePaymentToggleClick(e) {
-  const bookingId = e.target.getAttribute("data-id");
-  const currentPaymentStatus = e.target.getAttribute("data-status");
-  const newPaymentStatus = currentPaymentStatus === "Paid" ? "Unpaid" : "Paid";
-
-  // Use the generic modal for confirmation
-  const confirmed = await showGenericModal(
-    document.getElementById("detailsModal"), // Re-using detailsModal for confirmation
-    `Confirm Payment Status Change`,
-    `<p>Are you sure you want to mark this transaction as <strong>${newPaymentStatus}</strong>?</p>`,
-    document.getElementById("modalBody"), // Re-using modalBody
-    true // show confirmation buttons
-  );
-
-  if (confirmed) {
-    await updatePaymentStatus(bookingId, newPaymentStatus);
-  }
-}
-
-/**
- * Updates the checkout status of a booking in Firestore.
- * @param {string} bookingId - The ID of the booking to update.
- * @param {string} newStatus - The new checkout status ("Checked-Out").
- */
-async function updateCheckoutStatus(bookingId, newStatus) {
-  try {
-    console.log(
-      `Updating checkout status for booking ${bookingId} to ${newStatus}`
-    );
-
-    const bookingRef = doc(db, "bookings", bookingId);
-
-    // Update both status and payment status to "Paid" since customer is checking out
-    await updateDoc(bookingRef, {
-      status: newStatus,
-      "paymentDetails.paymentStatus": "Paid", // Mark as paid when checking out
-      updatedAt: new Date(),
-    });
-
-    console.log("Checkout status and payment status updated successfully");
-
-    // Show success message
-    alert(
-      "Checkout confirmed successfully. The booking status has been updated to 'Checked-Out' and payment status has been marked as 'Paid'."
-    );
-
-    // Refresh the sales data
-    await loadSalesData();
-  } catch (error) {
-    console.error("Error updating checkout status:", error);
-
-    showGenericModal(
-      document.getElementById("detailsModal"),
-      "Error",
-      `<p>Failed to update checkout status: ${error.message}</p>`,
-      document.getElementById("modalBody"),
-      false // don't show confirmation buttons
-    );
-  }
-}
-
-/**
- * Updates the payment status of a booking in Firestore.
- * @param {string} bookingId - The ID of the booking to update.
- * @param {string} newStatus - The new payment status ("Paid" or "Unpaid").
- */
-async function updatePaymentStatus(bookingId, newStatus) {
-  try {
-    const bookingRef = doc(db, "bookings", bookingId);
-    await updateDoc(bookingRef, {
-      "paymentDetails.paymentStatus": newStatus, // Update nested field
-    });
-    console.log(`Booking ${bookingId} payment status updated to ${newStatus}.`);
-    loadSalesData(); // Re-load data to reflect changes
-  } catch (error) {
-    console.error("Error updating payment status:", error);
-    showGenericModal(
-      document.getElementById("detailsModal"),
-      "Error",
-      `<p>Failed to update payment status: ${error.message}</p>`,
-      document.getElementById("modalBody"),
-      false // don't show confirmation buttons
-    );
-  }
 }
 
 // Format date
 function formatDate(dateString) {
   if (!dateString) return "N/A";
   const date = new Date(dateString);
-  // Check if the date is valid before formatting
   if (isNaN(date.getTime())) {
     return "Invalid Date";
   }
@@ -442,7 +283,6 @@ function handleDateFilterChange() {
 
   if (dateValue === "custom") {
     customDateInputs.style.display = "block";
-    // Set default dates (current month)
     const now = new Date();
     const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
     const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0);
@@ -453,7 +293,6 @@ function handleDateFilterChange() {
     customDateInputs.style.display = "none";
   }
 
-  // Apply the filter
   applyFilters();
 }
 
@@ -464,27 +303,24 @@ function filterSalesData() {
 
 // Apply filters to sales data
 function applyFilters() {
-  const statusValue = statusFilter.value; // This is the booking status filter (Approved, Rejected, etc.)
-  const checkoutValue = checkoutFilter.value; // This is the checkout status filter
+  const statusValue = statusFilter.value;
+  const checkoutValue = checkoutFilter.value;
   const dateValue = dateFilter.value;
 
   let filteredData = [...allProcessedSalesData];
 
-  // Filter by Booking Status (Approved, Rejected, etc.)
   if (statusValue !== "All") {
     filteredData = filteredData.filter((sale) => sale.status === statusValue);
   }
 
-  // Filter by Checkout Status
   if (checkoutValue !== "All") {
     filteredData = filteredData.filter(
       (sale) => sale.checkoutStatus === checkoutValue
     );
   }
 
-  // Filter by Date Range (check-in/grooming date)
   if (dateValue !== "all") {
-    const now = new Date(); // Get current time
+    const now = new Date();
     const todayStart = new Date(
       now.getFullYear(),
       now.getMonth(),
@@ -493,7 +329,7 @@ function applyFilters() {
       0,
       0,
       0
-    ); // Start of today
+    );
     const todayEnd = new Date(
       now.getFullYear(),
       now.getMonth(),
@@ -502,14 +338,13 @@ function applyFilters() {
       59,
       59,
       999
-    ); // End of today
+    );
 
-    let filterStartDate = todayStart; // Default for 'today'
-    let filterEndDate = todayEnd; // Default for 'today'
+    let filterStartDate = todayStart;
+    let filterEndDate = todayEnd;
 
     switch (dateValue) {
       case "today":
-        // Already set by default
         break;
       case "tomorrow":
         filterStartDate = new Date(todayStart);
@@ -517,30 +352,29 @@ function applyFilters() {
         filterEndDate = new Date(todayEnd);
         filterEndDate.setDate(todayEnd.getDate() + 1);
         break;
-      case "week": // This week (Today + next 6 days)
+      case "week":
         filterStartDate = todayStart;
         filterEndDate = new Date(todayEnd);
-        filterEndDate.setDate(todayEnd.getDate() + 6); // Next 6 days from today's end
+        filterEndDate.setDate(todayEnd.getDate() + 6);
         break;
-      case "month": // Past month
+      case "month":
         filterStartDate = new Date(todayStart);
         filterStartDate.setMonth(todayStart.getMonth() - 1);
         break;
-      case "year": // Past year
+      case "year":
         filterStartDate = new Date(todayStart);
         filterStartDate.setFullYear(todayStart.getFullYear() - 1);
         break;
-      case "custom": // Custom date range
+      case "custom":
         const startDateValue = startDate.value;
         const endDateValue = endDate.value;
 
         if (startDateValue && endDateValue) {
           filterStartDate = new Date(startDateValue);
-          filterStartDate.setHours(0, 0, 0, 0); // Start of the day
+          filterStartDate.setHours(0, 0, 0, 0);
           filterEndDate = new Date(endDateValue);
-          filterEndDate.setHours(23, 59, 59, 999); // End of the day
+          filterEndDate.setHours(23, 59, 59, 999);
         } else {
-          // If custom dates are not selected, don't filter
           return;
         }
         break;
@@ -548,9 +382,8 @@ function applyFilters() {
 
     filteredData = filteredData.filter((sale) => {
       const saleDate = new Date(sale.date);
-      // Ensure saleDate is a valid date object before comparison
       if (isNaN(saleDate.getTime())) {
-        return false; // Exclude invalid dates
+        return false;
       }
       return saleDate >= filterStartDate && saleDate <= filterEndDate;
     });
@@ -572,7 +405,6 @@ window.viewSaleDetails = function (saleId) {
 
   modalHeader.textContent = `Sales Details - ${sale.transactionID}`;
 
-  // Use the fullBookingData stored in the sale object for detailed display
   const bookingData = sale.fullBookingData;
 
   let detailsHtml = `
@@ -612,7 +444,7 @@ window.viewSaleDetails = function (saleId) {
           <span>${formatDate(sale.date)}</span>
         </div>
         <div class="info-group">
-          <label>Booking Status:</label> <!-- Changed label for clarity -->
+          <label>Booking Status:</label>
           <span class="status-badge status-${(sale.status || "pending").toLowerCase()}">${sale.status || "Pending"}</span>
         </div>
         <div class="info-group">
@@ -622,7 +454,6 @@ window.viewSaleDetails = function (saleId) {
       </div>
   `;
 
-  // Add more detailed booking information from fullBookingData
   if (bookingData) {
     detailsHtml += `
       <div class="info-section">
@@ -785,13 +616,12 @@ window.viewSaleDetails = function (saleId) {
           `;
     }
 
-    // Admin notes (handled as an array for consistency)
     let adminNotesArray = [];
     if (bookingData.adminNotes) {
       if (Array.isArray(bookingData.adminNotes)) {
         adminNotesArray = bookingData.adminNotes;
       } else if (typeof bookingData.adminNotes === "string") {
-        adminNotesArray = [this.adminNotes]; // Convert string to array
+        adminNotesArray = [this.adminNotes];
       }
     }
     detailsHtml += `
@@ -802,7 +632,7 @@ window.viewSaleDetails = function (saleId) {
       `;
   }
 
-  detailsHtml += `</div>`; // Close user-details wrapper
+  detailsHtml += `</div>`;
 
   modalBody.innerHTML = detailsHtml;
 
@@ -823,13 +653,8 @@ document.addEventListener("DOMContentLoaded", function () {
   loadSalesData();
 });
 
-// Make loadSalesData available globally for other pages to refresh sales reports
 window.refreshSalesReports = loadSalesData;
 
-/**
- * Automatically updates payment status to "Paid" for checked-out bookings that don't have it set
- * @param {Array} fetchedSales - Array of sales data
- */
 async function autoUpdatePaymentStatusForCheckedOutBookings(fetchedSales) {
   try {
     const bookingsToUpdate = fetchedSales.filter(
@@ -867,12 +692,7 @@ async function autoUpdatePaymentStatusForCheckedOutBookings(fetchedSales) {
   }
 }
 
-/**
- * Adds a summary section showing financial overview
- * @param {Array} salesData - Array of sales data
- */
 function addSalesSummary(salesData) {
-  // Calculate totals
   const totalRevenue = salesData.reduce(
     (sum, sale) => sum + sale.totalAmount,
     0
@@ -885,7 +705,6 @@ function addSalesSummary(salesData) {
   const totalCollected = totalDownPayments + (totalRevenue - totalBalances);
   const totalOutstanding = totalBalances;
 
-  // Count bookings by status
   const checkedOutCount = salesData.filter((sale) => sale.isCheckedOut).length;
   const pendingCount = salesData.filter((sale) => !sale.isCheckedOut).length;
   const paidCount = salesData.filter(
@@ -895,7 +714,6 @@ function addSalesSummary(salesData) {
     (sale) => sale.paymentStatus === "Unpaid"
   ).length;
 
-  // Create summary HTML
   const summaryHTML = `
     <div style="margin-top: 30px; padding: 20px; background: #f8f9fa; border-radius: 8px; border: 1px solid #e9ecef;">
       <h3 style="color: #333; margin-bottom: 20px; border-bottom: 2px solid #ffb64a; padding-bottom: 10px;">Financial Summary</h3>
@@ -952,16 +770,12 @@ function addSalesSummary(salesData) {
     </div>
   `;
 
-  // Add summary to the page
   const tableContainer = document.querySelector(".table-container");
   if (tableContainer) {
-    // Remove existing summary if any
     const existingSummary = tableContainer.nextElementSibling;
     if (existingSummary && existingSummary.style.marginTop === "30px") {
       existingSummary.remove();
     }
-
-    // Insert summary after table
     tableContainer.insertAdjacentHTML("afterend", summaryHTML);
   }
 }

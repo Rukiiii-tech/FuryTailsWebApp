@@ -139,7 +139,7 @@
         top: 0;
         z-index: 2; /* avoid overlaying outside container */
         white-space: nowrap;
-        box-shadow: 0 2px 0 rgba(0,0,0,0.06); /* subtle separation from rows */
+        box-shadow: 0 2px 0 rgba(0, 0, 0, 0.06); /* subtle separation from rows */
       }
 
       .data-table td {
@@ -417,7 +417,6 @@
               </select>
             </div>
 
-            <!-- Custom Date Range Inputs (initially hidden) -->
             <div
               id="customDateInputs"
               class="filter-group"
@@ -507,21 +506,45 @@
           </div>
         </div>
 
-        <div class="table-container" style="overflow: auto; max-height: 70vh; border: 1px solid #ddd; border-radius: 8px;">
-          <table class="data-table" style="min-width: 1400px; width: 100%;">
-            <thead style="position: sticky; top: 0; background: #ffb64a; z-index: 10;">
+        <div
+          class="table-container"
+          style="
+            overflow: auto;
+            max-height: 70vh;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+          "
+        >
+          <table class="data-table" style="min-width: 1400px; width: 100%">
+            <thead
+              style="position: sticky; top: 0; background: #ffb64a; z-index: 10"
+            >
               <tr>
-                <th style="padding: 15px 12px; white-space: nowrap;">Transaction ID</th>
-                <th style="padding: 15px 12px; white-space: nowrap;">Customer Name</th>
-                <th style="padding: 15px 12px; white-space: nowrap;">Service Type</th>
-                <th style="padding: 15px 12px; white-space: nowrap;">Pet Size</th>
-                <th style="padding: 15px 12px; white-space: nowrap;">Amount</th>
-                <th style="padding: 15px 12px; white-space: nowrap;">Down Payment</th>
-                <th style="padding: 15px 12px; white-space: nowrap;">Balance</th>
-                <th style="padding: 15px 12px; white-space: nowrap;">Payment Method</th>
-                <th style="padding: 15px 12px; white-space: nowrap;">Date</th>
-                <th style="padding: 15px 12px; white-space: nowrap;">Status</th>
-                <th style="padding: 15px 12px; white-space: nowrap;">Checkout Status</th>
+                <th style="padding: 15px 12px; white-space: nowrap">
+                  Transaction ID
+                </th>
+                <th style="padding: 15px 12px; white-space: nowrap">
+                  Customer Name
+                </th>
+                <th style="padding: 15px 12px; white-space: nowrap">
+                  Service Type
+                </th>
+                <th style="padding: 15px 12px; white-space: nowrap">
+                  Pet Size
+                </th>
+                <th style="padding: 15px 12px; white-space: nowrap">Amount</th>
+                <th style="padding: 15px 12px; white-space: nowrap">
+                  Down Payment
+                </th>
+                <th style="padding: 15px 12px; white-space: nowrap">Balance</th>
+                <th style="padding: 15px 12px; white-space: nowrap">
+                  Payment Method
+                </th>
+                <th style="padding: 15px 12px; white-space: nowrap">Date</th>
+                <th style="padding: 15px 12px; white-space: nowrap">Status</th>
+                <th style="padding: 15px 12px; white-space: nowrap">
+                  Checkout Status
+                </th>
               </tr>
             </thead>
             <tbody id="salesTableBody">
@@ -586,7 +609,10 @@
 
         // Close submenu when clicking outside
         document.addEventListener("click", function (e) {
-          if (!e.target.closest("#reportsDropdown") && !e.target.closest("#reportsSubmenu")) {
+          if (
+            !e.target.closest("#reportsDropdown") &&
+            !e.target.closest("#reportsSubmenu")
+          ) {
             reportsSubmenu.classList.remove("active");
             reportsDropdown.innerHTML = "Reports ▼";
           }

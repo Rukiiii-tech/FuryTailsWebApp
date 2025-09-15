@@ -20,7 +20,7 @@
           <a href="users.html">Users</a>
           <a href="pets.html">Pets</a>
           <a href="bookings.html">Bookings</a>
-          
+
           <!-- Reports Sub-menu -->
           <div class="nav-item">
             <a href="#" class="nav-link" id="reportsDropdown">Reports ▼</a>
@@ -86,33 +86,36 @@
       import { initializeLogout } from "./js/logout-handler.js";
       initializeLogout();
     </script>
-    
+
     <!-- Sub-menu Toggle Script -->
     <script>
-      document.addEventListener('DOMContentLoaded', function() {
-        const reportsDropdown = document.getElementById('reportsDropdown');
-        const reportsSubmenu = document.getElementById('reportsSubmenu');
-        
+      document.addEventListener("DOMContentLoaded", function () {
+        const reportsDropdown = document.getElementById("reportsDropdown");
+        const reportsSubmenu = document.getElementById("reportsSubmenu");
+
         // Only handle reports dropdown clicks
-        reportsDropdown.addEventListener('click', function(e) {
+        reportsDropdown.addEventListener("click", function (e) {
           e.preventDefault();
           e.stopPropagation(); // Prevent event bubbling
-          reportsSubmenu.classList.toggle('active');
-          
+          reportsSubmenu.classList.toggle("active");
+
           // Change arrow direction
-          if (reportsSubmenu.classList.contains('active')) {
-            reportsDropdown.innerHTML = 'Reports ▲';
+          if (reportsSubmenu.classList.contains("active")) {
+            reportsDropdown.innerHTML = "Reports ▲";
           } else {
-            reportsDropdown.innerHTML = 'Reports ▼';
+            reportsDropdown.innerHTML = "Reports ▼";
           }
         });
-        
+
         // Close submenu when clicking outside the reports section specifically
-        document.addEventListener('click', function(e) {
+        document.addEventListener("click", function (e) {
           // Only close if clicking outside the reports dropdown area
-          if (!e.target.closest('#reportsDropdown') && !e.target.closest('#reportsSubmenu')) {
-            reportsSubmenu.classList.remove('active');
-            reportsDropdown.innerHTML = 'Reports ▼';
+          if (
+            !e.target.closest("#reportsDropdown") &&
+            !e.target.closest("#reportsSubmenu")
+          ) {
+            reportsSubmenu.classList.remove("active");
+            reportsDropdown.innerHTML = "Reports ▼";
           }
         });
       });
