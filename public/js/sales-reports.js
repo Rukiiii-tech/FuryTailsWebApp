@@ -25,6 +25,10 @@ const customDateInputs = document.getElementById("customDateInputs");
 const startDate = document.getElementById("startDate");
 const endDate = document.getElementById("endDate");
 
+const printSelectedRowsBtn = document.getElementById("printSelectedRowsBtn");
+const selectAllRowsCheckbox = document.getElementById("selectAllRows");
+const printContainer = document.getElementById("printContainer");
+
 /**
  * Determines the pet size category based on its weight in kilograms, using the updated chart.
  * @param {number} weightKg - The pet's weight in kilograms.
@@ -105,7 +109,7 @@ async function loadSalesData() {
   try {
     salesTableBody.innerHTML = `
       <tr>
-        <td colspan="10" style="text-align: center; padding: 20px;">
+        <td colspan="12" style="text-align: center; padding: 20px;">
           Loading transaction data...
         </td>
       </tr>
@@ -205,11 +209,13 @@ async function loadSalesData() {
     await autoUpdatePaymentStatusForCheckedOutBookings(fetchedSales);
 
     displaySalesData(allProcessedSalesData);
+    setupCheckboxListeners(); // Add this line to set up the listeners
+    updatePrintButtonState(); // Update the button state on load
   } catch (error) {
     console.error("Error loading sales data from bookings collection:", error);
     salesTableBody.innerHTML = `
       <tr>
-        <td colspan="10" style="text-align: center; padding: 20px; color: red;">
+        <td colspan="12" style="text-align: center; padding: 20px; color: red;">
           Error loading transaction data. Please check the browser console for details (F12).
         </td>
       </tr>
@@ -222,7 +228,7 @@ function displaySalesData(salesData) {
   if (salesData.length === 0) {
     salesTableBody.innerHTML = `
       <tr>
-        <td colspan="10" style="text-align: center; padding: 20px;">
+        <td colspan="12" style="text-align: center; padding: 20px;">
           No transaction data found.
         </td>
       </tr>
@@ -234,6 +240,7 @@ function displaySalesData(salesData) {
     .map(
       (sale) => `
     <tr>
+      <td><input type="checkbox" class="row-checkbox" /></td>
       <td>${sale.transactionID}</td>
       <td>${sale.customerName}</td>
       <td>${sale.serviceType}</td>
@@ -390,6 +397,7 @@ function applyFilters() {
   }
 
   displaySalesData(filteredData);
+  setupCheckboxListeners();
 }
 
 // View sale details
@@ -715,7 +723,7 @@ function addSalesSummary(salesData) {
   ).length;
 
   const summaryHTML = `
-    <div style="margin-top: 30px; padding: 20px; background: #f8f9fa; border-radius: 8px; border: 1px solid #e9ecef;">
+    <div class="no-print" style="margin-top: 30px; padding: 20px; background: #f8f9fa; border-radius: 8px; border: 1px solid #e9ecef;">
       <h3 style="color: #333; margin-bottom: 20px; border-bottom: 2px solid #ffb64a; padding-bottom: 10px;">Financial Summary</h3>
       
       <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; margin-bottom: 20px;">
@@ -758,7 +766,7 @@ function addSalesSummary(salesData) {
         
         <div style="text-align: center; padding: 10px; background: white; border-radius: 6px;">
           <h5 style="color: #dc3545; margin: 0 0 5px 0;">Unpaid</h5>
-          <p style="font-size: 1.2em; font-weight: bold; margin: 0; color: #333;">${unpaidCount}</p>
+          <p style="font-size: 1.2em; font-weight: bold; margin: 0; color: #334;">${unpaidCount}</p>
         </div>
       </div>
       
@@ -778,4 +786,93 @@ function addSalesSummary(salesData) {
     }
     tableContainer.insertAdjacentHTML("afterend", summaryHTML);
   }
+}
+
+// Function to update the state of the "Print Selected Rows" button
+function updatePrintButtonState() {
+  const selectedCheckboxes = salesTableBody.querySelectorAll(
+    ".row-checkbox:checked"
+  );
+  if (selectedCheckboxes.length > 0) {
+    printSelectedRowsBtn.disabled = false;
+    printSelectedRowsBtn.classList.remove("print-button-disabled");
+  } else {
+    printSelectedRowsBtn.disabled = true;
+    printSelectedRowsBtn.classList.add("print-button-disabled");
+  }
+}
+
+// Function to set up the checkbox event listeners
+function setupCheckboxListeners() {
+  const checkboxes = salesTableBody.querySelectorAll(".row-checkbox");
+  checkboxes.forEach((checkbox) => {
+    checkbox.addEventListener("change", updatePrintButtonState);
+  });
+
+  selectAllRowsCheckbox.addEventListener("change", function () {
+    const allCheckboxes = salesTableBody.querySelectorAll(".row-checkbox");
+    allCheckboxes.forEach((checkbox) => {
+      checkbox.checked = this.checked;
+    });
+    updatePrintButtonState();
+  });
+
+  printSelectedRowsBtn.addEventListener("click", () => {
+    const selectedRows = salesTableBody.querySelectorAll(
+      ".row-checkbox:checked"
+    );
+    if (selectedRows.length === 0) {
+      alert("Please select at least one row to print.");
+      return;
+    }
+
+    // Save current content to restore it later
+    const originalBodyContent = document.body.innerHTML;
+
+    // Create the content you want to print
+    const printContent = document.createElement("div");
+
+    // Add a header for the printed report
+    const printHeader = document.createElement("div");
+    printHeader.className = "print-header";
+    printHeader.innerHTML = `
+      <h1>Sales Report</h1>
+      <p class="meta">Generated: ${new Date().toLocaleDateString()} ${new Date().toLocaleTimeString()}</p>
+    `;
+    printContent.appendChild(printHeader);
+
+    // Build the table for printing
+    const originalTable = document.querySelector(".data-table");
+    const printTable = originalTable.cloneNode(true);
+    const printTbody = printTable.querySelector("tbody");
+
+    printTbody.innerHTML = "";
+
+    selectedRows.forEach((checkbox) => {
+      const row = checkbox.closest("tr").cloneNode(true);
+      row.querySelector("td:first-child").remove();
+      printTbody.appendChild(row);
+    });
+
+    const tableHeader = printTable.querySelector("thead tr");
+    if (tableHeader) {
+      tableHeader.querySelector("th:first-child").remove();
+    }
+
+    printContent.appendChild(printTable);
+
+    // Replace body content with only the content to be printed
+    document.body.innerHTML = "";
+    document.body.appendChild(printContent);
+
+    // Call print
+    window.print();
+
+    // Restore original content after a slight delay
+    setTimeout(() => {
+      document.body.innerHTML = originalBodyContent;
+      // Re-attach event listeners to the new DOM elements
+      loadSalesData();
+    }, 500);
+  });
 }

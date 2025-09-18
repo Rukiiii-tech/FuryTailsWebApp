@@ -21,7 +21,6 @@
           <a href="pets.html">Pets</a>
           <a href="bookings.html">Bookings</a>
 
-          <!-- Reports Sub-menu -->
           <div class="nav-item">
             <a href="#" class="nav-link" id="reportsDropdown">Reports ▼</a>
             <div class="submenu active" id="reportsSubmenu">
@@ -60,6 +59,11 @@
             </tbody>
           </table>
         </div>
+        <div class="pagination-controls">
+          <button id="prevPageBtn" disabled>Previous</button>
+          <span id="pageInfo">Page 1</span>
+          <button id="nextPageBtn" disabled>Next</button>
+        </div>
       </div>
     </div>
 
@@ -87,7 +91,6 @@
       initializeLogout();
     </script>
 
-    <!-- Sub-menu Toggle Script -->
     <script>
       document.addEventListener("DOMContentLoaded", function () {
         const reportsDropdown = document.getElementById("reportsDropdown");

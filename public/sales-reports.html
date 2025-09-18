@@ -295,6 +295,16 @@
         background-color: #f5f5f5;
         width: calc(100% - 0px); /* fill remaining space after padding */
       }
+
+      /* New style to show only the print container during printing */
+      .print-table-container {
+        display: none;
+      }
+
+      .print-button-disabled {
+        background-color: #cccccc !important;
+        cursor: not-allowed !important;
+      }
     </style>
   </head>
   <body>
@@ -489,8 +499,9 @@
               Refresh Data
             </button>
             <button
-              id="printReportBtn"
-              class="no-print"
+              id="printSelectedRowsBtn"
+              class="no-print print-button-disabled"
+              disabled
               style="
                 padding: 8px 16px;
                 background: #4a90e2;
@@ -501,7 +512,7 @@
                 font-weight: 500;
               "
             >
-              Export Report
+              Print Selected Rows
             </button>
           </div>
         </div>
@@ -521,35 +532,90 @@
             >
               <tr>
                 <th style="padding: 15px 12px; white-space: nowrap">
+                  <input type="checkbox" id="selectAllRows" />
+                </th>
+                <th
+                  class="print-column"
+                  data-column="transactionId"
+                  style="padding: 15px 12px; white-space: nowrap"
+                >
                   Transaction ID
                 </th>
-                <th style="padding: 15px 12px; white-space: nowrap">
+                <th
+                  class="print-column"
+                  data-column="customerName"
+                  style="padding: 15px 12px; white-space: nowrap"
+                >
                   Customer Name
                 </th>
-                <th style="padding: 15px 12px; white-space: nowrap">
+                <th
+                  class="print-column"
+                  data-column="serviceType"
+                  style="padding: 15px 12px; white-space: nowrap"
+                >
                   Service Type
                 </th>
-                <th style="padding: 15px 12px; white-space: nowrap">
+                <th
+                  class="print-column"
+                  data-column="petSize"
+                  style="padding: 15px 12px; white-space: nowrap"
+                >
                   Pet Size
                 </th>
-                <th style="padding: 15px 12px; white-space: nowrap">Amount</th>
-                <th style="padding: 15px 12px; white-space: nowrap">
+                <th
+                  class="print-column"
+                  data-column="amount"
+                  style="padding: 15px 12px; white-space: nowrap"
+                >
+                  Amount
+                </th>
+                <th
+                  class="print-column"
+                  data-column="downPayment"
+                  style="padding: 15px 12px; white-space: nowrap"
+                >
                   Down Payment
                 </th>
-                <th style="padding: 15px 12px; white-space: nowrap">Balance</th>
-                <th style="padding: 15px 12px; white-space: nowrap">
+                <th
+                  class="print-column"
+                  data-column="balance"
+                  style="padding: 15px 12px; white-space: nowrap"
+                >
+                  Balance
+                </th>
+                <th
+                  class="print-column"
+                  data-column="paymentMethod"
+                  style="padding: 15px 12px; white-space: nowrap"
+                >
                   Payment Method
                 </th>
-                <th style="padding: 15px 12px; white-space: nowrap">Date</th>
-                <th style="padding: 15px 12px; white-space: nowrap">Status</th>
-                <th style="padding: 15px 12px; white-space: nowrap">
+                <th
+                  class="print-column"
+                  data-column="date"
+                  style="padding: 15px 12px; white-space: nowrap"
+                >
+                  Date
+                </th>
+                <th
+                  class="print-column"
+                  data-column="status"
+                  style="padding: 15px 12px; white-space: nowrap"
+                >
+                  Status
+                </th>
+                <th
+                  class="print-column"
+                  data-column="checkoutStatus"
+                  style="padding: 15px 12px; white-space: nowrap"
+                >
                   Checkout Status
                 </th>
               </tr>
             </thead>
             <tbody id="salesTableBody">
               <tr>
-                <td colspan="11" style="text-align: center; padding: 20px">
+                <td colspan="12" style="text-align: center; padding: 20px">
                   Loading sales reports...
                 </td>
               </tr>
@@ -558,6 +624,8 @@
         </div>
       </div>
     </div>
+
+    <div id="printContainer" class="print-table-container"></div>
 
     <div id="detailsModal" class="modal">
       <div class="modal-content">
@@ -586,20 +654,15 @@
     <script type="module">
       import { setupPrint } from "./js/print.js";
       setupPrint("Sales Reports");
-    </script>
 
-    <script>
       document.addEventListener("DOMContentLoaded", function () {
         const reportsDropdown = document.getElementById("reportsDropdown");
         const reportsSubmenu = document.getElementById("reportsSubmenu");
 
-        // Handle reports dropdown clicks
         reportsDropdown.addEventListener("click", function (e) {
           e.preventDefault();
           e.stopPropagation();
           reportsSubmenu.classList.toggle("active");
-
-          // Change arrow direction
           if (reportsSubmenu.classList.contains("active")) {
             reportsDropdown.innerHTML = "Reports ▲";
           } else {
@@ -607,7 +670,6 @@
           }
         });
 
-        // Close submenu when clicking outside
         document.addEventListener("click", function (e) {
           if (
             !e.target.closest("#reportsDropdown") &&

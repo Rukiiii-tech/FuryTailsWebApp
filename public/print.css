@@ -1,102 +1,41 @@
 @media screen {
-  .print-only {
-    display: none !important;
+  .print-only,
+  .print-table-container {
+    display: none;
   }
 }
 
 @media print {
-  html, body {
+  html,
+  body {
     background: #ffffff !important;
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
+    padding: 0;
+    margin: 0;
   }
 
-  body {
-    background-image: none !important;
-  }
-
-  /* Hide non-report UI */
+  /* Hide all dashboard UI elements */
   .sidebar,
   .logout,
-  .controls-container,
-  .nav-item,
-  #reportsSubmenu,
-  #reportsDropdown,
-  #overlay,
+  .controls-section,
+  .table-container,
   .modal,
-  .action-buttons,
-  .btn,
-  button,
-  .no-print {
+  .overlay,
+  .no-print,
+  .page-header {
     display: none !important;
   }
 
-  .print-only {
+  /* Show the specific content for printing */
+  .print-only,
+  .print-table-container {
     display: block !important;
-  }
-
-  .dashboard-container {
-    display: block !important;
-  }
-
-  .main-content {
-    padding: 0 !important;
-    background: #ffffff !important;
-  }
-
-  .table-container {
-    border: none !important;
-    padding: 0 !important;
-    margin-top: 10px !important;
-  }
-
-  /* Table adjustments for print */
-  .data-table,
-  .users-table,
-  .pets-table {
-    min-width: 0 !important;
     width: 100% !important;
-    border: 1px solid #000 !important;
-    font-size: 12px !important;
+    height: auto !important;
+    overflow: visible !important;
   }
 
-  .data-table thead,
-  .users-table thead,
-  .pets-table thead {
-    background: #ffffff !important;
-    color: #000000 !important;
-  }
-
-  .data-table th,
-  .users-table th,
-  .pets-table th,
-  .data-table td,
-  .users-table td,
-  .pets-table td {
-    border: 1px solid #000 !important;
-    padding: 8px !important;
-  }
-
-  .data-table tbody tr:nth-child(even),
-  .users-table tbody tr:nth-child(even),
-  .pets-table tbody tr:nth-child(even),
-  .data-table tbody tr:hover,
-  .users-table tbody tr:hover,
-  .pets-table tbody tr:hover {
-    background: none !important;
-  }
-
-  /* Hide the Actions column (assumed to be last) */
-  .data-table th:last-child,
-  .data-table td:last-child,
-  .users-table th:last-child,
-  .users-table td:last-child,
-  .pets-table th:last-child,
-  .pets-table td:last-child {
-    display: none !important;
-  }
-
-  /* Print header */
   .print-header {
     margin-bottom: 10px;
     padding-bottom: 10px;
@@ -112,11 +51,29 @@
     font-size: 12px;
   }
 
+  /* Style the printed table */
+  .print-table-container .data-table {
+    min-width: 0 !important;
+    width: 100% !important;
+    border: 1px solid #000 !important;
+    font-size: 12px !important;
+    page-break-inside: auto !important;
+  }
+
+  .print-table-container .data-table th,
+  .print-table-container .data-table td {
+    border: 1px solid #000 !important;
+    padding: 8px !important;
+    page-break-inside: avoid !important;
+  }
+
+  .print-table-container .data-table tbody tr:nth-child(even),
+  .print-table-container .data-table tbody tr:hover {
+    background: none !important;
+  }
+
   a {
     text-decoration: none !important;
     color: #000 !important;
   }
 }
-
-
-

@@ -7,6 +7,8 @@ import {
   doc,
   getDoc,
   Timestamp,
+  startAfter,
+  limit,
 } from "https://www.gstatic.com/firebasejs/11.9.0/firebase-firestore.js";
 import {
   showGenericModal,
@@ -15,6 +17,10 @@ import {
 } from "./modal_handler.js";
 
 let allFeedingReportsData = {};
+let lastVisible = null; // Stores the last document of the current page for pagination
+let firstVisible = null; // Stores the first document of the current page
+let currentPage = 1;
+const REPORTS_PER_PAGE = 10;
 
 document.addEventListener("DOMContentLoaded", async () => {
   const feedingTableBody = document.getElementById("feedingTableBody");
@@ -33,23 +39,65 @@ document.addEventListener("DOMContentLoaded", async () => {
     );
   }
 
-  const fetchFeedingReports = async () => {
+  const prevPageBtn = document.getElementById("prevPageBtn");
+  const nextPageBtn = document.getElementById("nextPageBtn");
+  const pageInfoSpan = document.getElementById("pageInfo");
+
+  // Event Listeners for pagination buttons
+  if (prevPageBtn) {
+    prevPageBtn.addEventListener("click", () => navigatePage(-1));
+  }
+  if (nextPageBtn) {
+    nextPageBtn.addEventListener("click", () => navigatePage(1));
+  }
+
+  const navigatePage = (direction) => {
+    if (direction === 1 && nextPageBtn.disabled) return;
+    if (direction === -1 && prevPageBtn.disabled) return;
+    currentPage += direction;
+    renderFeedingReportsTable();
+  };
+
+  const fetchFeedingReports = async (lastDoc, direction = 1) => {
     try {
-      console.log(
-        "Fetching feeding reports from 'feedingHistory' collection..."
-      );
-      const feedingReportsQuery = query(
-        collection(db, "feedingHistory"),
-        orderBy("scheduledAt", "desc")
-      );
-      const querySnapshot = await getDocs(feedingReportsQuery);
-      console.log("Query snapshot size:", querySnapshot.size);
-      const feedingReports = [];
+      console.log(`Fetching feeding reports for page ${currentPage}...`);
+      const feedingReportsRef = collection(db, "feedingHistory");
+      let baseQuery = query(feedingReportsRef, orderBy("scheduledAt", "desc"));
+
+      if (lastDoc) {
+        if (direction === 1) {
+          baseQuery = query(baseQuery, startAfter(lastDoc));
+        } else if (direction === -1) {
+          // To go backward, we need to reverse the order and then reverse the results
+          baseQuery = query(
+            collection(db, "feedingHistory"),
+            orderBy("scheduledAt", "asc"),
+            startAfter(lastDoc)
+          );
+        }
+      }
+
+      const paginatedQuery = query(baseQuery, limit(REPORTS_PER_PAGE));
+      const querySnapshot = await getDocs(paginatedQuery);
+
+      let feedingReports = [];
       querySnapshot.forEach((doc) => {
         const data = doc.data();
         feedingReports.push({ id: doc.id, ...data });
       });
+
+      // If navigating backward, reverse the array to maintain correct order
+      if (direction === -1) {
+        feedingReports.reverse();
+      }
+
+      console.log("Query snapshot size:", querySnapshot.size);
       console.log("Final feeding reports array:", feedingReports);
+
+      // Update the lastVisible and firstVisible documents for the next/prev queries
+      firstVisible = querySnapshot.docs[0];
+      lastVisible = querySnapshot.docs[querySnapshot.docs.length - 1];
+
       return feedingReports;
     } catch (error) {
       console.error("Error fetching feeding reports:", error);
@@ -58,8 +106,43 @@ document.addEventListener("DOMContentLoaded", async () => {
   };
 
   const renderFeedingReportsTable = async () => {
-    const feedingReports = await fetchFeedingReports();
     const feedingTableBody = document.getElementById("feedingTableBody");
+    feedingTableBody.innerHTML =
+      '<tr><td colspan="7" style="text-align: center; padding: 20px;">Loading feeding reports...</td></tr>';
+
+    let lastDoc = null;
+    if (currentPage > 1) {
+      // Find the last visible doc of the previous page
+      const previousPagesQuery = query(
+        collection(db, "feedingHistory"),
+        orderBy("scheduledAt", "desc"),
+        limit((currentPage - 1) * REPORTS_PER_PAGE)
+      );
+      const previousSnapshot = await getDocs(previousPagesQuery);
+      if (!previousSnapshot.empty) {
+        lastDoc = previousSnapshot.docs[previousSnapshot.docs.length - 1];
+      }
+    }
+
+    const feedingReports = await fetchFeedingReports(lastDoc);
+
+    // Check if there's a next page by querying for one more document
+    const nextPageCheckQuery = query(
+      collection(db, "feedingHistory"),
+      orderBy("scheduledAt", "desc"),
+      startAfter(lastVisible),
+      limit(1)
+    );
+    const nextPageSnapshot = await getDocs(nextPageCheckQuery);
+
+    const hasNextPage = !nextPageSnapshot.empty;
+    const hasPrevPage = currentPage > 1;
+
+    // Update button states and page info
+    prevPageBtn.disabled = !hasPrevPage;
+    nextPageBtn.disabled = !hasNextPage;
+    pageInfoSpan.textContent = `Page ${currentPage}`;
+
     feedingTableBody.innerHTML = "";
 
     if (feedingReports.length === 0) {
@@ -73,7 +156,6 @@ document.addEventListener("DOMContentLoaded", async () => {
       tempFeedingReportsData[report.id] = report;
       const row = document.createElement("tr");
 
-      // Determine feeding time display: list specificTimes, fallback to scheduledAt/timestamp
       let displayFeedingTime = "N/A";
       if (
         report.specificTimes &&
@@ -93,13 +175,8 @@ document.addEventListener("DOMContentLoaded", async () => {
         displayFeedingTime = report.schedule.time;
       }
 
-      // Determine food type display (using foodBrand from Firestore)
       const displayFoodType = report.foodBrand || "N/A";
-
-      // Room Type - will be N/A if not in Firestore, assuming 'roomType' field or falling back to 'roomNumber'
       const displayRoomType = report.roomType || report.roomNumber || "N/A";
-
-      // Status - will be N/A if not in Firestore
       const displayStatus = report.status || "N/A";
 
       row.innerHTML = `
@@ -122,15 +199,11 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   /**
    * Attaches event listeners for the "View Details" buttons.
-   * This ensures listeners are re-attached after the table is re-rendered.
    */
   const attachFeedingReportListeners = () => {
-    // Remove existing listeners to prevent duplicates
     document.querySelectorAll(".btn-view").forEach((btn) => {
       btn.removeEventListener("click", handleViewDetailsClick);
     });
-
-    // Attach new listeners
     document.querySelectorAll(".btn-view").forEach((btn) => {
       btn.addEventListener("click", handleViewDetailsClick);
     });
@@ -178,7 +251,6 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     modalHeader.textContent = `Feeding Report: ${reportId}`;
 
-    // Determine Feeding Schedule Time display for modal: list specificTimes, fallback to scheduledAt/timestamp
     let displayFeedingScheduleTimeForModal = "N/A";
     if (
       reportData.specificTimes &&
@@ -198,13 +270,8 @@ document.addEventListener("DOMContentLoaded", async () => {
       displayFeedingScheduleTimeForModal = reportData.schedule.time;
     }
 
-    // Determine Actual Feeding Time display for modal: uses the same logic as schedule time for simplicity
     let displayActualFeedingTimeForModal = displayFeedingScheduleTimeForModal;
-
-    // Determine food type display (using foodBrand from Firestore)
     const displayFoodTypeForModal = reportData.foodBrand || "N/A";
-
-    // Room Type for modal details
     const displayRoomTypeForModal =
       reportData.roomType || reportData.roomNumber || "N/A";
 
