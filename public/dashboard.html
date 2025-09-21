@@ -46,13 +46,21 @@
           </div>
 
           <div class="stat-card stat-pending" id="pendingBookingsCard">
-            <img src="image/icon-pending-bookings.png" alt="Pending Bookings" class="stat-icon" />
+            <img
+              src="image/icon-pending-bookings.png"
+              alt="Pending Bookings"
+              class="stat-icon"
+            />
             <h3>Pending Bookings</h3>
             <div class="stat-number" id="pendingBookingsCount">0</div>
           </div>
 
           <div class="stat-card stat-feeding" id="feedingReportsCard">
-            <img src="image/icon-feeding-reports.png" alt="Feeding Reports" class="stat-icon" />
+            <img
+              src="image/icon-feeding-reports.png"
+              alt="Feeding Reports"
+              class="stat-icon"
+            />
             <h3>Feeding Reports</h3>
             <div class="stat-number" id="feedingReportsCount">0</div>
           </div>
@@ -64,7 +72,11 @@
           </div>
 
           <div class="stat-card stat-booked" id="totalBookedCard">
-            <img src="image/icon-total-booked.png" alt="Total Booked" class="stat-icon" />
+            <img
+              src="image/icon-total-booked.png"
+              alt="Total Booked"
+              class="stat-icon"
+            />
             <h3>Total Booked</h3>
             <div class="stat-number" id="totalBookedCount">0</div>
           </div>
@@ -417,7 +429,11 @@
           switch (period) {
             case "week":
               date = new Date(now.getTime() - i * 7 * 24 * 60 * 60 * 1000);
-              label = `Week ${date.getDate()}/${date.getMonth() + 1}`;
+              // FIXED: Changed to a more user-friendly date format
+              label = date.toLocaleDateString("en-US", {
+                month: "short",
+                day: "numeric",
+              });
               historicalData.push(Math.floor(Math.random() * 5000) + 3000);
               break;
             case "month":
@@ -458,7 +474,11 @@
               const nextWeek = new Date(
                 now.getTime() + i * 7 * 24 * 60 * 60 * 1000
               );
-              label = `Week ${nextWeek.getDate()}/${nextWeek.getMonth() + 1}`;
+              // FIXED: Changed to a more user-friendly date format
+              label = nextWeek.toLocaleDateString("en-US", {
+                month: "short",
+                day: "numeric",
+              });
               break;
             case "month":
               const nextMonth = new Date(

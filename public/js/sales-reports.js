@@ -173,7 +173,7 @@ async function loadSalesData() {
       const isCheckedOut =
         bookingData.status === "Checked-Out" ||
         bookingData.status === "Completed";
-      const checkoutStatus = isCheckedOut ? "Checked Out" : "Not Checked Out";
+      const checkoutStatus = isCheckedOut ? "Completed" : "Pending";
 
       let paymentStatus = bookingData.paymentDetails?.paymentStatus || "Unpaid";
       if (isCheckedOut) {
@@ -249,7 +249,7 @@ function displaySalesData(salesData) {
       <td>₱${sale.downPayment.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
       <td>${
         sale.isCheckedOut
-          ? '<span style="color: #28a745; font-weight: bold;">₱0.00 (Paid)</span>'
+          ? '<span style="color: #28a745; font-weight: bold;">₱0.00</span>'
           : `₱${sale.balance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
       }</td>
       <td>${sale.paymentMethod}</td>
