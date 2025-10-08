@@ -12,7 +12,6 @@ import {
 } from "https://www.gstatic.com/firebasejs/11.9.0/firebase-firestore.js";
 import {
   showGenericModal,
-  hideGenericModal,
   initializeModalCloseListeners,
 } from "./modal_handler.js";
 
@@ -21,6 +20,76 @@ let lastVisible = null; // Stores the last document of the current page for pagi
 let firstVisible = null; // Stores the first document of the current page
 let currentPage = 1;
 const REPORTS_PER_PAGE = 10;
+
+// Helper to format a time string (e.g., '14:30' from a document field)
+// or a Date object (if converting a Timestamp) into 'H:MM AM/PM' format.
+function formatTime(timeInput) {
+  if (!timeInput) return "N/A";
+
+  let hours, minutes;
+
+  if (typeof timeInput === "string") {
+    // Handle string format like '14:30'
+    const parts = timeInput.split(":");
+    if (parts.length < 2) return timeInput;
+    hours = parseInt(parts[0]);
+    minutes = parts[1];
+  } else if (timeInput instanceof Date) {
+    // Handle Date object (from Timestamp.toDate())
+    hours = timeInput.getHours();
+    minutes = timeInput.getMinutes().toString().padStart(2, "0");
+  } else {
+    return "N/A";
+  }
+
+  // Convert to 12-hour format
+  const ampm = hours >= 12 ? "PM" : "AM";
+  hours = hours % 12;
+  hours = hours ? hours : 12; // the hour '0' should be '12'
+
+  return `${hours}:${minutes} ${ampm}`;
+}
+
+/**
+ * Fetches all necessary external data (Users, Pets, Bookings) to augment reports.
+ * This is crucial for fixing N/A for Pet Name, Owner Name, and Room Type.
+ * @returns {Promise<{usersMap: Map, petsMap: Map, bookingsMap: Map}>} Maps for quick lookup.
+ */
+const fetchBatchDetails = async () => {
+  // 1. Fetch all required documents concurrently
+  const [usersSnapshot, petsSnapshot, bookingsSnapshot] = await Promise.all([
+    getDocs(query(collection(db, "users"))),
+    getDocs(query(collection(db, "pets"))),
+    getDocs(query(collection(db, "bookings"))),
+  ]);
+
+  // 2. Map IDs to Data
+  const usersMap = new Map();
+  usersSnapshot.forEach((doc) => {
+    const data = doc.data();
+    usersMap.set(doc.id, {
+      name: `${data.firstName || ""} ${data.lastName || ""}`.trim(),
+    });
+  });
+
+  const petsMap = new Map();
+  petsSnapshot.forEach((doc) => {
+    petsMap.set(doc.id, doc.data().petName);
+  });
+
+  const bookingsMap = new Map();
+  bookingsSnapshot.forEach((doc) => {
+    const data = doc.data();
+    bookingsMap.set(doc.id, {
+      // Priority for cageType from petProfile, fallback to selectedRoomType
+      roomType:
+        data.petProfile?.cageType || data.boardingDetails?.selectedRoomType,
+      foodBrand: data.petProfile?.foodBrand, // Fetched but not displayed
+    });
+  });
+
+  return { usersMap, petsMap, bookingsMap };
+};
 
 document.addEventListener("DOMContentLoaded", async () => {
   const feedingTableBody = document.getElementById("feedingTableBody");
@@ -107,8 +176,9 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   const renderFeedingReportsTable = async () => {
     const feedingTableBody = document.getElementById("feedingTableBody");
+    // Colspan set to 6
     feedingTableBody.innerHTML =
-      '<tr><td colspan="7" style="text-align: center; padding: 20px;">Loading feeding reports...</td></tr>';
+      '<tr><td colspan="6" style="text-align: center; padding: 20px;">Loading feeding reports...</td></tr>';
 
     let lastDoc = null;
     if (currentPage > 1) {
@@ -146,44 +216,80 @@ document.addEventListener("DOMContentLoaded", async () => {
     feedingTableBody.innerHTML = "";
 
     if (feedingReports.length === 0) {
+      // Colspan set to 6
       feedingTableBody.innerHTML =
-        "<tr><td colspan='7' style='text-align: center; padding: 20px;'>No feeding reports found.</td></tr>";
+        "<tr><td colspan='6' style='text-align: center; padding: 20px;'>No feeding reports found.</td></tr>";
       return;
     }
 
+    // --- BATCH FETCH AND AUGMENT REPORTS ---
+    const { usersMap, petsMap, bookingsMap } = await fetchBatchDetails();
+
     const tempFeedingReportsData = {};
-    feedingReports.forEach((report) => {
+
+    // Augment reports with display names/types using the maps
+    const reportsWithDetails = feedingReports.map((report) => {
+      const petNameFromMap = petsMap.get(report.petId);
+      const ownerFromMap = usersMap.get(report.userId);
+      const bookingDetails = bookingsMap.get(report.bookingId) || {};
+
+      let displayPetName = petNameFromMap || report.petName || "N/A";
+      let displayOwnerName = ownerFromMap?.name || report.ownerName || "N/A";
+
+      // Room Type Fix
+      let displayRoomType =
+        bookingDetails.roomType ||
+        report.roomType ||
+        report.roomNumber ||
+        "N/A";
+
+      // Food Type (Fetched but NOT used for display)
+      let displayFoodType =
+        report.foodBrand || bookingDetails.foodBrand || "N/A";
+
+      // Status Fix
+      let displayStatus =
+        report.status || (report.actualTime ? "Completed" : "Pending");
+
+      return {
+        ...report,
+        displayPetName,
+        displayOwnerName,
+        displayRoomType,
+        displayFoodType,
+        displayStatus,
+      };
+    });
+    // --- END AUGMENTATION ---
+
+    reportsWithDetails.forEach((report) => {
       tempFeedingReportsData[report.id] = report;
       const row = document.createElement("tr");
 
       let displayFeedingTime = "N/A";
+      // Determine the best time display
       if (
         report.specificTimes &&
         Array.isArray(report.specificTimes) &&
         report.specificTimes.length > 0
       ) {
-        displayFeedingTime = `<ul>${report.specificTimes.map((item) => `<li>${item.time || "N/A"}</li>`).join("")}</ul>`;
+        // Display a list of all scheduled times
+        displayFeedingTime = `<ul>${report.specificTimes.map((item) => `<li>${formatTime(item.time)}</li>`).join("")}</ul>`;
       } else if (report.scheduledAt instanceof Timestamp) {
-        displayFeedingTime = new Date(
-          report.scheduledAt.toDate()
-        ).toLocaleString();
-      } else if (report.timestamp instanceof Timestamp) {
-        displayFeedingTime = new Date(
-          report.timestamp.toDate()
-        ).toLocaleString();
+        // Display a single scheduled time from a Timestamp
+        displayFeedingTime = formatTime(report.scheduledAt.toDate());
       } else if (report.schedule && report.schedule.time) {
-        displayFeedingTime = report.schedule.time;
+        // Fallback for older schedule structure (if needed)
+        displayFeedingTime = formatTime(report.schedule.time);
       }
+      // Note: Removed redundant checks for report.timestamp, report.scheduledAt string conversion
 
-      const displayFoodType = report.foodBrand || "N/A";
-      const displayRoomType = report.roomType || report.roomNumber || "N/A";
-      const displayStatus = report.status || "N/A";
+      const displayStatus = report.displayStatus;
 
       row.innerHTML = `
         <td>${report.id}</td>
-        <td>${report.petName || "N/A"}</td>
-        <td>${displayRoomType}</td>
-        <td>${displayFoodType}</td>
+        <td>${report.displayPetName}</td>
+        <td>${report.displayRoomType}</td>
         <td>${displayFeedingTime}</td>
         <td><span class="status-badge status-${displayStatus.toLowerCase().replace(" ", "-")}">${displayStatus}</span></td>
         <td>
@@ -192,8 +298,8 @@ document.addEventListener("DOMContentLoaded", async () => {
       `;
       feedingTableBody.appendChild(row);
     });
-    allFeedingReportsData = tempFeedingReportsData;
 
+    allFeedingReportsData = tempFeedingReportsData;
     attachFeedingReportListeners();
   };
 
@@ -218,6 +324,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   async function viewFeedingReportDetails(reportId) {
     let reportData = allFeedingReportsData[reportId];
+    let isDataCached = !!reportData;
 
     if (!reportData) {
       console.log(
@@ -241,9 +348,59 @@ document.addEventListener("DOMContentLoaded", async () => {
         alert("Error fetching feeding report details: " + err.message);
         return;
       }
-    } else {
-      console.log("Feeding report data found in cache:", reportData);
     }
+
+    // --- Augment missing details for single report fetch if not in cache ---
+    if (!isDataCached || !reportData.displayOwnerName) {
+      // Fetch Pet Name
+      const petSnap = reportData.petId
+        ? await getDoc(doc(db, "pets", reportData.petId))
+        : { exists: false };
+      reportData.displayPetName = petSnap.exists()
+        ? petSnap.data().petName
+        : reportData.petName || "N/A";
+
+      // Fetch Owner Name
+      const userSnap = reportData.userId
+        ? await getDoc(doc(db, "users", reportData.userId))
+        : { exists: false };
+      reportData.displayOwnerName = userSnap.exists()
+        ? `${userSnap.data().firstName || ""} ${userSnap.data().lastName || ""}`.trim()
+        : reportData.ownerName || "N/A";
+
+      // Fetch Booking details (Room Type)
+      if (reportData.bookingId) {
+        const bookingRef = doc(db, "bookings", reportData.bookingId);
+        const bookingSnap = await getDoc(bookingRef);
+        if (bookingSnap.exists()) {
+          const bookingData = bookingSnap.data();
+          reportData.displayRoomType =
+            bookingData.petProfile?.cageType ||
+            bookingData.boardingDetails?.selectedRoomType ||
+            reportData.roomType ||
+            reportData.roomNumber ||
+            "N/A";
+          reportData.displayFoodType =
+            bookingData.petProfile?.foodBrand || reportData.foodBrand || "N/A";
+        } else {
+          reportData.displayRoomType =
+            reportData.roomType || reportData.roomNumber || "N/A";
+          reportData.displayFoodType = reportData.foodBrand || "N/A";
+        }
+      } else {
+        reportData.displayRoomType =
+          reportData.roomType || reportData.roomNumber || "N/A";
+        reportData.displayFoodType = reportData.foodBrand || "N/A";
+      }
+
+      // Status augmentation
+      reportData.displayStatus =
+        reportData.status || (reportData.actualTime ? "Completed" : "Pending");
+
+      // Update cache with augmented data
+      allFeedingReportsData[reportId] = reportData;
+    }
+    // --- END AUGMENTATION ---
 
     const modal = document.getElementById("detailsModal");
     const modalHeader = document.getElementById("modalHeader");
@@ -252,28 +409,34 @@ document.addEventListener("DOMContentLoaded", async () => {
     modalHeader.textContent = `Feeding Report: ${reportId}`;
 
     let displayFeedingScheduleTimeForModal = "N/A";
+
+    // Determine the best time display for the modal
     if (
       reportData.specificTimes &&
       Array.isArray(reportData.specificTimes) &&
       reportData.specificTimes.length > 0
     ) {
-      displayFeedingScheduleTimeForModal = `<ul>${reportData.specificTimes.map((item) => `<li>${item.time || "N/A"}</li>`).join("")}</ul>`;
+      // Display a list of all scheduled times
+      displayFeedingScheduleTimeForModal = `<ul>${reportData.specificTimes.map((item) => `<li>${formatTime(item.time)}</li>`).join("")}</ul>`;
     } else if (reportData.scheduledAt instanceof Timestamp) {
-      displayFeedingScheduleTimeForModal = new Date(
-        reportData.scheduledAt.toDate()
-      ).toLocaleString();
-    } else if (reportData.timestamp instanceof Timestamp) {
-      displayFeedingScheduleTimeForModal = new Date(
-        reportData.timestamp.toDate()
-      ).toLocaleString();
+      // Display a single scheduled time from a Timestamp, including date if it's not today (optional, but robust)
+      const date = reportData.scheduledAt.toDate();
+      const time = formatTime(date);
+      displayFeedingScheduleTimeForModal = `${date.toLocaleDateString()} at ${time}`;
     } else if (reportData.schedule && reportData.schedule.time) {
-      displayFeedingScheduleTimeForModal = reportData.schedule.time;
+      displayFeedingScheduleTimeForModal = formatTime(reportData.schedule.time);
     }
+    // Note: Removed redundant checks for report.timestamp
 
-    let displayActualFeedingTimeForModal = displayFeedingScheduleTimeForModal;
-    const displayFoodTypeForModal = reportData.foodBrand || "N/A";
-    const displayRoomTypeForModal =
-      reportData.roomType || reportData.roomNumber || "N/A";
+    // Use augmented data for display
+    const displayPetNameForModal = reportData.displayPetName || "N/A";
+    const displayOwnerNameForModal = reportData.displayOwnerName || "N/A";
+    const displayRoomTypeForModal = reportData.displayRoomType || "N/A";
+    const displayStatusForModal = reportData.displayStatus || "N/A";
+
+    let displayActualFeedingTimeForModal = reportData.actualTime
+      ? formatTime(reportData.actualTime)
+      : "N/A";
 
     modalBody.innerHTML = `
         <div class="info-section">
@@ -283,11 +446,11 @@ document.addEventListener("DOMContentLoaded", async () => {
           </div>
           <div class="info-group">
             <label>Pet Name</label>
-            <span>${reportData.petName || "N/A"}</span>
+            <span>${displayPetNameForModal}</span>
           </div>
           <div class="info-group">
             <label>Owner Name</label>
-            <span>${reportData.ownerName || "N/A"}</span>
+            <span>${displayOwnerNameForModal}</span>
           </div>
           <div class="info-group">
             <label>Pet ID</label>
@@ -300,10 +463,6 @@ document.addEventListener("DOMContentLoaded", async () => {
           <div class="info-group">
             <label>Room Type</label>
             <span>${displayRoomTypeForModal}</span>
-          </div>
-          <div class="info-group">
-            <label>Food Type</label>
-            <span>${displayFoodTypeForModal}</span>
           </div>
           <div class="info-group">
             <label>Feeding Schedule Time</label>
@@ -319,7 +478,7 @@ document.addEventListener("DOMContentLoaded", async () => {
           </div>
           <div class="info-group">
             <label>Status</label>
-            <span>${reportData.status || "N/A"}</span>
+            <span>${displayStatusForModal}</span>
           </div>
           <div class="info-group">
             <label>Picture Taken</label>

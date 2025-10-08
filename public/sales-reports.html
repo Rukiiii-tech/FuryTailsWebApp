@@ -142,6 +142,22 @@
         box-shadow: 0 2px 0 rgba(0, 0, 0, 0.06); /* subtle separation from rows */
       }
 
+      /* Style for the column header content (text + checkbox) */
+      .column-header-content {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 5px;
+      }
+
+      /* New style for the first TH (Select Row checkbox) */
+      .data-table th:first-child {
+        min-width: 40px; /* Ensure minimum width for checkbox column */
+        max-width: 40px;
+        width: 40px;
+        padding: 15px 5px; /* Adjust padding for checkbox */
+      }
+
       .data-table td {
         padding: 12px 15px;
         border-bottom: 1px solid #f0f0f0;
@@ -484,6 +500,15 @@
                 </div>
               </div>
             </div>
+
+            <div class="filter-group no-print">
+              <label
+                for="selectAllRows"
+                style="font-weight: 500; white-space: nowrap"
+                >Select All Rows</label
+              >
+              <input type="checkbox" id="selectAllRows" />
+            </div>
             <button
               id="refreshSalesBtn"
               style="
@@ -532,84 +557,184 @@
             >
               <tr>
                 <th style="padding: 15px 12px; white-space: nowrap">
-                  <input type="checkbox" id="selectAllRows" />
+                  <span class="no-print">#</span>
+                  <span class="print-only">#</span>
                 </th>
                 <th
-                  class="print-column"
-                  data-column="transactionId"
+                  class="data-column"
+                  data-column="transactionID"
+                  data-name="Transaction ID"
                   style="padding: 15px 12px; white-space: nowrap"
                 >
-                  Transaction ID
+                  <div class="column-header-content">
+                    Transaction ID
+                    <input
+                      type="checkbox"
+                      class="column-select-checkbox no-print"
+                      data-column-key="transactionID"
+                      checked
+                    />
+                  </div>
                 </th>
                 <th
-                  class="print-column"
+                  class="data-column"
                   data-column="customerName"
+                  data-name="Customer Name"
                   style="padding: 15px 12px; white-space: nowrap"
                 >
-                  Customer Name
+                  <div class="column-header-content">
+                    Customer Name
+                    <input
+                      type="checkbox"
+                      class="column-select-checkbox no-print"
+                      data-column-key="customerName"
+                      checked
+                    />
+                  </div>
                 </th>
                 <th
-                  class="print-column"
+                  class="data-column"
                   data-column="serviceType"
+                  data-name="Service Type"
                   style="padding: 15px 12px; white-space: nowrap"
                 >
-                  Service Type
+                  <div class="column-header-content">
+                    Service Type
+                    <input
+                      type="checkbox"
+                      class="column-select-checkbox no-print"
+                      data-column-key="serviceType"
+                      checked
+                    />
+                  </div>
                 </th>
                 <th
-                  class="print-column"
+                  class="data-column"
                   data-column="petSize"
+                  data-name="Pet Size"
                   style="padding: 15px 12px; white-space: nowrap"
                 >
-                  Pet Size
+                  <div class="column-header-content">
+                    Pet Size
+                    <input
+                      type="checkbox"
+                      class="column-select-checkbox no-print"
+                      data-column-key="petSize"
+                      checked
+                    />
+                  </div>
                 </th>
                 <th
-                  class="print-column"
-                  data-column="amount"
+                  class="data-column"
+                  data-column="totalAmount"
+                  data-name="Amount"
                   style="padding: 15px 12px; white-space: nowrap"
                 >
-                  Amount
+                  <div class="column-header-content">
+                    Amount
+                    <input
+                      type="checkbox"
+                      class="column-select-checkbox no-print"
+                      data-column-key="totalAmount"
+                      checked
+                    />
+                  </div>
                 </th>
                 <th
-                  class="print-column"
+                  class="data-column"
                   data-column="downPayment"
+                  data-name="Down Payment"
                   style="padding: 15px 12px; white-space: nowrap"
                 >
-                  Down Payment
+                  <div class="column-header-content">
+                    Down Payment
+                    <input
+                      type="checkbox"
+                      class="column-select-checkbox no-print"
+                      data-column-key="downPayment"
+                      checked
+                    />
+                  </div>
                 </th>
                 <th
-                  class="print-column"
+                  class="data-column"
                   data-column="balance"
+                  data-name="Balance"
                   style="padding: 15px 12px; white-space: nowrap"
                 >
-                  Balance
+                  <div class="column-header-content">
+                    Balance
+                    <input
+                      type="checkbox"
+                      class="column-select-checkbox no-print"
+                      data-column-key="balance"
+                      checked
+                    />
+                  </div>
                 </th>
                 <th
-                  class="print-column"
+                  class="data-column"
                   data-column="paymentMethod"
+                  data-name="Payment Method"
                   style="padding: 15px 12px; white-space: nowrap"
                 >
-                  Payment Method
+                  <div class="column-header-content">
+                    Payment Method
+                    <input
+                      type="checkbox"
+                      class="column-select-checkbox no-print"
+                      data-column-key="paymentMethod"
+                      checked
+                    />
+                  </div>
                 </th>
                 <th
-                  class="print-column"
+                  class="data-column"
                   data-column="date"
+                  data-name="Date"
                   style="padding: 15px 12px; white-space: nowrap"
                 >
-                  Date
+                  <div class="column-header-content">
+                    Date
+                    <input
+                      type="checkbox"
+                      class="column-select-checkbox no-print"
+                      data-column-key="date"
+                      checked
+                    />
+                  </div>
                 </th>
                 <th
-                  class="print-column"
+                  class="data-column"
                   data-column="status"
+                  data-name="Status"
                   style="padding: 15px 12px; white-space: nowrap"
                 >
-                  Status
+                  <div class="column-header-content">
+                    Status
+                    <input
+                      type="checkbox"
+                      class="column-select-checkbox no-print"
+                      data-column-key="status"
+                      checked
+                    />
+                  </div>
                 </th>
                 <th
-                  class="print-column"
+                  class="data-column"
                   data-column="checkoutStatus"
+                  data-name="Checkout Status"
                   style="padding: 15px 12px; white-space: nowrap"
                 >
-                  Checkout Status
+                  <div class="column-header-content">
+                    Checkout Status
+                    <input
+                      type="checkbox"
+                      class="column-select-checkbox no-print"
+                      data-column-key="checkoutStatus"
+                      checked
+                    />
+                  </div>
                 </th>
               </tr>
             </thead>

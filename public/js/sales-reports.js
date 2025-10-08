@@ -27,7 +27,7 @@ const endDate = document.getElementById("endDate");
 
 const printSelectedRowsBtn = document.getElementById("printSelectedRowsBtn");
 const selectAllRowsCheckbox = document.getElementById("selectAllRows");
-const printContainer = document.getElementById("printContainer");
+const dataTableThead = document.querySelector(".data-table thead tr");
 
 /**
  * Determines the pet size category based on its weight in kilograms, using the updated chart.
@@ -173,7 +173,7 @@ async function loadSalesData() {
       const isCheckedOut =
         bookingData.status === "Checked-Out" ||
         bookingData.status === "Completed";
-      const checkoutStatus = isCheckedOut ? "Completed" : "Pending";
+      const checkoutStatus = isCheckedOut ? "Checked Out" : "Not Checked Out";
 
       let paymentStatus = bookingData.paymentDetails?.paymentStatus || "Unpaid";
       if (isCheckedOut) {
@@ -209,7 +209,7 @@ async function loadSalesData() {
     await autoUpdatePaymentStatusForCheckedOutBookings(fetchedSales);
 
     displaySalesData(allProcessedSalesData);
-    setupCheckboxListeners(); // Add this line to set up the listeners
+    setupCheckboxListeners(); // Add this line to set up the row listeners
     updatePrintButtonState(); // Update the button state on load
   } catch (error) {
     console.error("Error loading sales data from bookings collection:", error);
@@ -240,24 +240,25 @@ function displaySalesData(salesData) {
     .map(
       (sale) => `
     <tr>
-      <td><input type="checkbox" class="row-checkbox" /></td>
-      <td>${sale.transactionID}</td>
-      <td>${sale.customerName}</td>
-      <td>${sale.serviceType}</td>
-      <td>${sale.petSize}</td>
-      <td>₱${sale.totalAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-      <td>₱${sale.downPayment.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-      <td>${
+      <td><input type="checkbox" class="row-select-checkbox" /></td> 
+      
+      <td data-column="transactionID">${sale.transactionID}</td>
+      <td data-column="customerName">${sale.customerName}</td>
+      <td data-column="serviceType">${sale.serviceType}</td>
+      <td data-column="petSize">${sale.petSize}</td>
+      <td data-column="totalAmount">₱${sale.totalAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+      <td data-column="downPayment">₱${sale.downPayment.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+      <td data-column="balance">${
         sale.isCheckedOut
-          ? '<span style="color: #28a745; font-weight: bold;">₱0.00</span>'
+          ? '<span style="color: #28a745; font-weight: bold;">₱0.00 (Paid)</span>'
           : `₱${sale.balance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
       }</td>
-      <td>${sale.paymentMethod}</td>
-      <td>${formatDate(sale.date)}</td>
-      <td>
+      <td data-column="paymentMethod">${sale.paymentMethod}</td>
+      <td data-column="date">${formatDate(sale.date)}</td>
+      <td data-column="status">
         <span class="status-badge status-${(sale.paymentStatus || "unpaid").toLowerCase()}">${sale.paymentStatus || "Unpaid"}</span>
       </td>
-      <td>
+      <td data-column="checkoutStatus">
         <span class="status-badge ${sale.isCheckedOut ? "status-checked-out" : "status-not-checked-out"}">
           ${sale.checkoutStatus}
         </span>
@@ -790,10 +791,19 @@ function addSalesSummary(salesData) {
 
 // Function to update the state of the "Print Selected Rows" button
 function updatePrintButtonState() {
-  const selectedCheckboxes = salesTableBody.querySelectorAll(
-    ".row-checkbox:checked"
+  const selectedRowsCheckboxes = salesTableBody.querySelectorAll(
+    ".row-select-checkbox:checked"
   );
-  if (selectedCheckboxes.length > 0) {
+
+  const selectedColumnCheckboxes = dataTableThead.querySelectorAll(
+    ".column-select-checkbox:checked"
+  );
+
+  // The print button is enabled only if at least one row AND one column are selected
+  if (
+    selectedRowsCheckboxes.length > 0 &&
+    selectedColumnCheckboxes.length > 0
+  ) {
     printSelectedRowsBtn.disabled = false;
     printSelectedRowsBtn.classList.remove("print-button-disabled");
   } else {
@@ -802,77 +812,170 @@ function updatePrintButtonState() {
   }
 }
 
-// Function to set up the checkbox event listeners
+// Function to set up the row and column checkbox event listeners
 function setupCheckboxListeners() {
-  const checkboxes = salesTableBody.querySelectorAll(".row-checkbox");
-  checkboxes.forEach((checkbox) => {
+  // Row Checkboxes (in Tbody)
+  const rowCheckboxes = salesTableBody.querySelectorAll(".row-select-checkbox");
+  rowCheckboxes.forEach((checkbox) => {
+    checkbox.removeEventListener("change", updatePrintButtonState); // Remove old listeners first
     checkbox.addEventListener("change", updatePrintButtonState);
   });
 
-  selectAllRowsCheckbox.addEventListener("change", function () {
-    const allCheckboxes = salesTableBody.querySelectorAll(".row-checkbox");
-    allCheckboxes.forEach((checkbox) => {
-      checkbox.checked = this.checked;
-    });
-    updatePrintButtonState();
+  // Column Checkboxes (in Thead)
+  const columnCheckboxes = dataTableThead.querySelectorAll(
+    ".column-select-checkbox"
+  );
+  columnCheckboxes.forEach((checkbox) => {
+    checkbox.removeEventListener("change", updatePrintButtonState); // Remove old listeners first
+    checkbox.addEventListener("change", updatePrintButtonState);
   });
 
-  printSelectedRowsBtn.addEventListener("click", () => {
-    const selectedRows = salesTableBody.querySelectorAll(
-      ".row-checkbox:checked"
-    );
-    if (selectedRows.length === 0) {
-      alert("Please select at least one row to print.");
-      return;
-    }
+  // Select All Rows Checkbox
+  if (selectAllRowsCheckbox) {
+    selectAllRowsCheckbox.removeEventListener("change", handleSelectAllChange);
+    selectAllRowsCheckbox.addEventListener("change", handleSelectAllChange);
+  }
 
-    // Save current content to restore it later
-    const originalBodyContent = document.body.innerHTML;
+  // Ensure print button listener is only added once
+  if (!printSelectedRowsBtn.listenerAdded) {
+    printSelectedRowsBtn.addEventListener("click", handlePrintSelectedRows);
+    printSelectedRowsBtn.listenerAdded = true;
+  }
 
-    // Create the content you want to print
-    const printContent = document.createElement("div");
+  // Initial check to sync selectAll checkbox state
+  const allRowsCheckboxes = salesTableBody.querySelectorAll(
+    ".row-select-checkbox"
+  );
+  const checkedRowsCheckboxes = salesTableBody.querySelectorAll(
+    ".row-select-checkbox:checked"
+  );
+  if (selectAllRowsCheckbox) {
+    selectAllRowsCheckbox.checked =
+      allRowsCheckboxes.length > 0 &&
+      allRowsCheckboxes.length === checkedRowsCheckboxes.length;
+  }
 
-    // Add a header for the printed report
-    const printHeader = document.createElement("div");
-    printHeader.className = "print-header";
-    printHeader.innerHTML = `
+  updatePrintButtonState();
+}
+
+function handleSelectAllChange(e) {
+  const allCheckboxes = salesTableBody.querySelectorAll(".row-select-checkbox");
+  allCheckboxes.forEach((checkbox) => {
+    checkbox.checked = e.target.checked;
+  });
+  updatePrintButtonState();
+}
+
+/**
+ * Handles the logic for printing only selected rows and selected columns.
+ */
+function handlePrintSelectedRows() {
+  const selectedRows = salesTableBody.querySelectorAll(
+    ".row-select-checkbox:checked"
+  );
+
+  // 1. Determine which columns the user wants to print
+  const selectedColumnKeys = Array.from(
+    dataTableThead.querySelectorAll(".column-select-checkbox:checked")
+  ).map((cb) => cb.getAttribute("data-column-key"));
+
+  if (selectedRows.length === 0 || selectedColumnKeys.length === 0) {
+    alert("Please select at least one row and one column to print.");
+    return;
+  }
+
+  // Save current content to restore it later
+  const originalBodyContent = document.body.innerHTML;
+  const printContent = document.createElement("div");
+
+  // Add a header for the printed report
+  const printHeader = document.createElement("div");
+  printHeader.className = "print-header";
+  printHeader.innerHTML = `
       <h1>Sales Report</h1>
       <p class="meta">Generated: ${new Date().toLocaleDateString()} ${new Date().toLocaleTimeString()}</p>
     `;
-    printContent.appendChild(printHeader);
+  printContent.appendChild(printHeader);
 
-    // Build the table for printing
-    const originalTable = document.querySelector(".data-table");
-    const printTable = originalTable.cloneNode(true);
-    const printTbody = printTable.querySelector("tbody");
+  // Build the table for printing
+  const originalTable = document.querySelector(".data-table");
+  const printTable = originalTable.cloneNode(false); // Clone only the table structure
+  printTable.style.minWidth = "initial"; // Remove min-width for printing
+  const printThead = document.createElement("thead");
+  const printTbody = document.createElement("tbody");
+  printTable.appendChild(printThead);
+  printTable.appendChild(printTbody);
 
-    printTbody.innerHTML = "";
+  // 2. Build the new Header (THEAD) with only selected columns
+  const headerRow = document.createElement("tr");
 
-    selectedRows.forEach((checkbox) => {
-      const row = checkbox.closest("tr").cloneNode(true);
-      row.querySelector("td:first-child").remove();
-      printTbody.appendChild(row);
-    });
+  // The first column in the original table is the row-select checkbox. We must skip it (index 0).
+  const originalColumnHeaders = dataTableThead.querySelectorAll("th");
 
-    const tableHeader = printTable.querySelector("thead tr");
-    if (tableHeader) {
-      tableHeader.querySelector("th:first-child").remove();
+  originalColumnHeaders.forEach((originalTh, index) => {
+    // Skip the first TH (the row selection checkbox header)
+    if (index === 0) {
+      // Add a simple '#' or blank TH for the row counter in print
+      const printTh = document.createElement("th");
+      printTh.textContent = "#";
+      headerRow.appendChild(printTh);
+      return;
     }
 
-    printContent.appendChild(printTable);
+    const columnKey = originalTh.getAttribute("data-column");
 
-    // Replace body content with only the content to be printed
-    document.body.innerHTML = "";
-    document.body.appendChild(printContent);
-
-    // Call print
-    window.print();
-
-    // Restore original content after a slight delay
-    setTimeout(() => {
-      document.body.innerHTML = originalBodyContent;
-      // Re-attach event listeners to the new DOM elements
-      loadSalesData();
-    }, 500);
+    if (selectedColumnKeys.includes(columnKey)) {
+      const printTh = document.createElement("th");
+      // Get the text content, ignoring the checkbox
+      const headerText = originalTh.textContent.trim();
+      printTh.textContent = headerText;
+      headerRow.appendChild(printTh);
+    }
   });
+  printThead.appendChild(headerRow);
+
+  // 3. Build the new Body (TBODY) with only selected rows and columns
+  let rowCounter = 1;
+  selectedRows.forEach((checkbox) => {
+    const originalRow = checkbox.closest("tr");
+    const printRow = document.createElement("tr");
+
+    // Add the Row Counter TD
+    const counterTd = document.createElement("td");
+    counterTd.textContent = rowCounter++;
+    printRow.appendChild(counterTd);
+
+    // Iterate through the cells of the original row
+    originalRow.querySelectorAll("td").forEach((originalTd, index) => {
+      // Skip the first TD (the row selection checkbox)
+      if (index === 0) return;
+
+      const columnKey = originalTd.getAttribute("data-column");
+
+      if (selectedColumnKeys.includes(columnKey)) {
+        const printTd = document.createElement("td");
+        // Clone the content (including inner spans/badges)
+        printTd.innerHTML = originalTd.innerHTML;
+        printRow.appendChild(printTd);
+      }
+    });
+
+    printTbody.appendChild(printRow);
+  });
+
+  printContent.appendChild(printTable);
+
+  // Replace body content with only the content to be printed
+  document.body.innerHTML = "";
+  document.body.appendChild(printContent);
+
+  // Call print
+  window.print();
+
+  // Restore original content after a slight delay
+  setTimeout(() => {
+    document.body.innerHTML = originalBodyContent;
+    // Re-attach event listeners to the new DOM elements
+    loadSalesData();
+  }, 500);
 }
