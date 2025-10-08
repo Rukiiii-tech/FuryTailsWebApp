@@ -20,6 +20,8 @@ let lastVisible = null; // Stores the last document of the current page for pagi
 let firstVisible = null; // Stores the first document of the current page
 let currentPage = 1;
 const REPORTS_PER_PAGE = 10;
+// Define the window in milliseconds for "On Feeding" status (4 minutes)
+const ON_FEEDING_WINDOW_MS = 4 * 60 * 1000;
 
 // Helper to format a time string (e.g., '14:30' from a document field)
 // or a Date object (if converting a Timestamp) into 'H:MM AM/PM' format.
@@ -247,9 +249,35 @@ document.addEventListener("DOMContentLoaded", async () => {
       let displayFoodType =
         report.foodBrand || bookingDetails.foodBrand || "N/A";
 
-      // Status Fix
-      let displayStatus =
-        report.status || (report.actualTime ? "Completed" : "Pending");
+      // === STATUS FIX START: NEW LOGIC (Completed, On Feeding, Pending) ===
+      let displayStatus = "Pending"; // Default status
+      const now = new Date();
+      let scheduledDate = null;
+      if (report.scheduledAt instanceof Timestamp) {
+        scheduledDate = report.scheduledAt.toDate();
+      }
+
+      if (report.actualTime) {
+        // 1. Explicitly Completed
+        displayStatus = "Completed";
+      } else if (scheduledDate) {
+        const timeDifference = now.getTime() - scheduledDate.getTime();
+
+        if (timeDifference > 0 && timeDifference <= ON_FEEDING_WINDOW_MS) {
+          // 2. On Feeding Window: Scheduled time met (passed > 0) but within 4 minutes.
+          displayStatus = "On Feeding";
+        } else if (timeDifference > ON_FEEDING_WINDOW_MS) {
+          // 3. Auto-Completed: Scheduled time passed by more than 4 minutes.
+          displayStatus = "Completed";
+        } else {
+          // 4. Pending: Scheduled for the future (timeDifference <= 0)
+          displayStatus = "Pending";
+        }
+      } else {
+        // Fallback for reports with missing scheduled time
+        displayStatus = "Pending";
+      }
+      // === STATUS FIX END ===
 
       return {
         ...report,
@@ -393,9 +421,35 @@ document.addEventListener("DOMContentLoaded", async () => {
         reportData.displayFoodType = reportData.foodBrand || "N/A";
       }
 
-      // Status augmentation
-      reportData.displayStatus =
-        reportData.status || (reportData.actualTime ? "Completed" : "Pending");
+      // === STATUS FIX START: NEW LOGIC (Completed, On Feeding, Pending) ===
+      reportData.displayStatus = "Pending"; // Default status
+      const now = new Date();
+      let scheduledDate = null;
+      if (reportData.scheduledAt instanceof Timestamp) {
+        scheduledDate = reportData.scheduledAt.toDate();
+      }
+
+      if (reportData.actualTime) {
+        // 1. Explicitly Completed
+        reportData.displayStatus = "Completed";
+      } else if (scheduledDate) {
+        const timeDifference = now.getTime() - scheduledDate.getTime();
+
+        if (timeDifference > 0 && timeDifference <= ON_FEEDING_WINDOW_MS) {
+          // 2. On Feeding Window: Scheduled time met (passed > 0) but within 4 minutes.
+          reportData.displayStatus = "On Feeding";
+        } else if (timeDifference > ON_FEEDING_WINDOW_MS) {
+          // 3. Auto-Completed: Scheduled time passed by more than 4 minutes.
+          reportData.displayStatus = "Completed";
+        } else {
+          // 4. Pending: Scheduled for the future (timeDifference <= 0)
+          reportData.displayStatus = "Pending";
+        }
+      } else {
+        // Fallback for reports with missing scheduled time
+        reportData.displayStatus = "Pending";
+      }
+      // === STATUS FIX END ===
 
       // Update cache with augmented data
       allFeedingReportsData[reportId] = reportData;
