@@ -9,6 +9,7 @@ import {
   doc,
   updateDoc,
 } from "./firebase-config.js";
+import { showWarningNotification } from "./notification-modal.js";
 
 import { showGenericModal } from "./modal_handler.js";
 
@@ -31,6 +32,7 @@ const dataTableThead = document.querySelector(".data-table thead tr");
 
 /**
  * Determines the pet size category based on its weight in kilograms, using the updated chart.
+ * NOTE: Corrected ranges for continuity.
  * @param {number} weightKg - The pet's weight in kilograms.
  * @returns {string} The pet size category (Small, Medium, Large, XL, XXL).
  */
@@ -39,20 +41,22 @@ function getPetSizeCategory(weightKg) {
     return "N/A";
   }
   if (weightKg < 10) return "Small";
-  if (weightKg >= 11 && weightKg <= 26) return "Medium";
+  if (weightKg >= 10 && weightKg <= 26) return "Medium"; // Fix: Ensures no gap with Small
   if (weightKg >= 27 && weightKg <= 34) return "Large";
-  if (weightKg >= 34 && weightKg <= 38) return "XL";
+  if (weightKg >= 35 && weightKg <= 38) return "XL"; // Fix: Ensures no overlap with Large
   if (weightKg > 38) return "XXL";
   return "N/A";
 }
 
 /**
  * Calculates the total amount, down payment, and balance for a booking based on pet size.
+ * FIX: The Total Amount for Checked-Out Boarding bookings is now explicitly set
+ * to the single-day price, and the balance is calculated from this amount.
  * @param {object} bookingData - The booking data from Firestore.
  * @returns {object} An object containing totalAmount, downPayment, and balance.
  */
 function calculateSalesAmounts(bookingData) {
-  let totalAmount = 0;
+  let fullTotalAmount = 0;
   let petWeight = parseFloat(bookingData.petInformation?.petWeight);
   let petSize = getPetSizeCategory(petWeight);
 
@@ -66,23 +70,50 @@ function calculateSalesAmounts(bookingData) {
     "N/A": 0,
   };
 
+  // Determine the daily price for all services
+  let dailyPrice = sizePrices[petSize] || 0;
+
   if (bookingData.serviceType === "Boarding") {
-    let dailyPrice = sizePrices[petSize] || 0;
     const checkInDateStr =
       bookingData.boardingDetails?.checkInDate || bookingData.date;
     const checkOutDateStr = bookingData.boardingDetails?.checkOutDate;
 
-    if (checkInDateStr && checkOutDateStr) {
-      const checkInDate = new Date(checkInDateStr);
-      const checkOutDate = new Date(checkOutDateStr);
-      const diffTime = Math.abs(checkOutDate.getTime() - checkInDate.getTime());
-      const daysDiff = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-      totalAmount = dailyPrice * Math.max(1, daysDiff);
+    if (checkInDateStr) {
+      let checkInDate = new Date(checkInDateStr);
+
+      if (isNaN(checkInDate.getTime())) {
+        fullTotalAmount = 0;
+      } else {
+        checkInDate.setHours(0, 0, 0, 0);
+
+        let checkOutDate;
+        if (checkOutDateStr) {
+          checkOutDate = new Date(checkOutDateStr);
+        }
+
+        if (checkOutDate && !isNaN(checkOutDate.getTime())) {
+          checkOutDate.setHours(0, 0, 0, 0); // Normalize check-out to start of day
+
+          // Calculate the full duration charge (Total Days Stayed) - Stored here for reference
+          const diffTime = checkOutDate.getTime() - checkInDate.getTime();
+          const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+
+          let actualDaysStayed = 0;
+          if (diffDays >= 0) {
+            actualDaysStayed = diffDays + 1;
+            fullTotalAmount = dailyPrice * actualDaysStayed; // This is the full revenue amount
+          } else {
+            fullTotalAmount = 0;
+          }
+        } else {
+          fullTotalAmount = 0;
+        }
+      }
     } else {
-      totalAmount = 0;
+      fullTotalAmount = 0;
     }
   } else if (bookingData.serviceType === "Grooming") {
-    totalAmount = sizePrices[petSize] || 0;
+    fullTotalAmount = dailyPrice;
   }
 
   let actualDownPayment = parseFloat(
@@ -92,16 +123,33 @@ function calculateSalesAmounts(bookingData) {
     actualDownPayment = 0;
   }
 
-  let balance = totalAmount - actualDownPayment;
+  // DETERMINE FINAL DISPLAY AMOUNT AND BALANCE
+  let totalAmountToDisplay = fullTotalAmount;
+  let balance = fullTotalAmount - actualDownPayment;
+
+  // *** THE FIX: Override Total Amount and Balance for Checked-Out Boarding ***
+  const isCheckedOut =
+    bookingData.status === "Checked-Out" || bookingData.status === "Completed";
 
   if (
-    bookingData.status === "Checked-Out" ||
-    bookingData.status === "Completed"
+    isCheckedOut &&
+    bookingData.serviceType === "Boarding" &&
+    dailyPrice > 0
   ) {
-    balance = 0;
+    // Set the Total Amount to the single day rate (e.g., P600.00) for display,
+    // as requested by the user, ignoring the duration.
+    totalAmountToDisplay = dailyPrice;
+
+    // Calculate balance based on the new display total (P600.00 - P399.00 = P201.00)
+    balance = totalAmountToDisplay - actualDownPayment;
   }
 
-  return { totalAmount, downPayment: actualDownPayment, balance, petSize };
+  return {
+    totalAmount: totalAmountToDisplay,
+    downPayment: actualDownPayment,
+    balance,
+    petSize,
+  };
 }
 
 // Load sales data from 'bookings' collection
@@ -176,6 +224,8 @@ async function loadSalesData() {
       const checkoutStatus = isCheckedOut ? "Checked Out" : "Not Checked Out";
 
       let paymentStatus = bookingData.paymentDetails?.paymentStatus || "Unpaid";
+
+      // FIX: Set paymentStatus to "Paid" if booking is Checked-Out or Completed
       if (isCheckedOut) {
         paymentStatus = "Paid";
       }
@@ -205,8 +255,6 @@ async function loadSalesData() {
       ...sale,
       ownerBookingCount: ownerBookingCounts.get(sale.customerName) || 0,
     }));
-
-    await autoUpdatePaymentStatusForCheckedOutBookings(fetchedSales);
 
     displaySalesData(allProcessedSalesData);
     setupCheckboxListeners(); // Add this line to set up the row listeners
@@ -239,32 +287,30 @@ function displaySalesData(salesData) {
   salesTableBody.innerHTML = salesData
     .map(
       (sale) => `
-    <tr>
-      <td><input type="checkbox" class="row-select-checkbox" /></td> 
-      
-      <td data-column="transactionID">${sale.transactionID}</td>
-      <td data-column="customerName">${sale.customerName}</td>
-      <td data-column="serviceType">${sale.serviceType}</td>
-      <td data-column="petSize">${sale.petSize}</td>
-      <td data-column="totalAmount">₱${sale.totalAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-      <td data-column="downPayment">₱${sale.downPayment.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-      <td data-column="balance">${
-        sale.isCheckedOut
-          ? '<span style="color: #28a745; font-weight: bold;">₱0.00 (Paid)</span>'
-          : `₱${sale.balance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
-      }</td>
-      <td data-column="paymentMethod">${sale.paymentMethod}</td>
-      <td data-column="date">${formatDate(sale.date)}</td>
-      <td data-column="status">
-        <span class="status-badge status-${(sale.paymentStatus || "unpaid").toLowerCase()}">${sale.paymentStatus || "Unpaid"}</span>
-      </td>
-      <td data-column="checkoutStatus">
-        <span class="status-badge ${sale.isCheckedOut ? "status-checked-out" : "status-not-checked-out"}">
-          ${sale.checkoutStatus}
-        </span>
-      </td>
-    </tr>
-  `
+      <tr>
+        <td><input type="checkbox" class="row-select-checkbox" /></td> 
+        
+        <td data-column="transactionID">${sale.transactionID}</td>
+        <td data-column="customerName">${sale.customerName}</td>
+        <td data-column="serviceType">${sale.serviceType}</td>
+        <td data-column="petSize">${sale.petSize}</td>
+        <td data-column="totalAmount">₱${sale.totalAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+        <td data-column="downPayment">₱${sale.downPayment.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+        <td data-column="balance">
+          ₱${sale.balance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+        </td>
+        <td data-column="paymentMethod">${sale.paymentMethod}</td>
+        <td data-column="date">${formatDate(sale.date)}</td>
+        <td data-column="status">
+          <span class="status-badge status-${(sale.paymentStatus || "unpaid").toLowerCase()}">${sale.paymentStatus || "Unpaid"}</span>
+        </td>
+        <td data-column="checkoutStatus">
+          <span class="status-badge ${sale.isCheckedOut ? "status-checked-out" : "status-not-checked-out"}">
+            ${sale.checkoutStatus}
+          </span>
+        </td>
+      </tr>
+    `
     )
     .join("");
 
@@ -664,43 +710,6 @@ document.addEventListener("DOMContentLoaded", function () {
 
 window.refreshSalesReports = loadSalesData;
 
-async function autoUpdatePaymentStatusForCheckedOutBookings(fetchedSales) {
-  try {
-    const bookingsToUpdate = fetchedSales.filter(
-      (sale) =>
-        sale.isCheckedOut &&
-        sale.fullBookingData.paymentDetails?.paymentStatus !== "Paid"
-    );
-
-    if (bookingsToUpdate.length > 0) {
-      console.log(
-        `Found ${bookingsToUpdate.length} checked-out bookings that need payment status update`
-      );
-
-      for (const sale of bookingsToUpdate) {
-        try {
-          const bookingRef = doc(db, "bookings", sale.id);
-          await updateDoc(bookingRef, {
-            "paymentDetails.paymentStatus": "Paid",
-          });
-          console.log(
-            `Updated payment status to "Paid" for booking ${sale.id}`
-          );
-        } catch (error) {
-          console.error(
-            `Failed to update payment status for booking ${sale.id}:`,
-            error
-          );
-        }
-      }
-
-      console.log("Auto-update of payment status completed");
-    }
-  } catch (error) {
-    console.error("Error in auto-updating payment status:", error);
-  }
-}
-
 function addSalesSummary(salesData) {
   const totalRevenue = salesData.reduce(
     (sum, sale) => sum + sale.totalAmount,
@@ -710,8 +719,11 @@ function addSalesSummary(salesData) {
     (sum, sale) => sum + sale.downPayment,
     0
   );
+  // Total Balances is the sum of remaining amounts due
   const totalBalances = salesData.reduce((sum, sale) => sum + sale.balance, 0);
-  const totalCollected = totalDownPayments + (totalRevenue - totalBalances);
+
+  // Total Collected is Revenue - Total Balances
+  const totalCollected = totalRevenue - totalBalances;
   const totalOutstanding = totalBalances;
 
   const checkedOutCount = salesData.filter((sale) => sale.isCheckedOut).length;
@@ -773,7 +785,7 @@ function addSalesSummary(salesData) {
       
       <div style="margin-top: 15px; padding: 10px; background: #e8f5e9; border-radius: 6px; border-left: 4px solid #28a745;">
         <p style="margin: 0; color: #2e7d32; font-size: 0.9em;">
-          <strong>Note:</strong> Checked-out bookings are automatically marked as "Paid" and their balance is set to ₱0.00
+          <strong>Note:</strong> The **Total Amount** for Checked-Out Boarding is now fixed to the **daily rate** ($\text{P}500/\text{P}600/\dots$), and the **Balance** is calculated based on this single-day amount. The payment status is always **Paid** upon checkout.
         </p>
       </div>
     </div>
@@ -880,7 +892,12 @@ function handlePrintSelectedRows() {
   ).map((cb) => cb.getAttribute("data-column-key"));
 
   if (selectedRows.length === 0 || selectedColumnKeys.length === 0) {
-    alert("Please select at least one row and one column to print.");
+    showWarningNotification(
+      "Selection Required",
+      "Please select at least one row and one column to print.",
+      "Use the checkboxes in the table to select the data you want to print.",
+      "⚠️"
+    );
     return;
   }
 

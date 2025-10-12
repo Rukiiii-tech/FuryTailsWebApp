@@ -14,11 +14,32 @@ import {
 } from "./firebase-config.js";
 
 // Import the modal handling functions
-import { showGenericModal } from "./modal_handler.js"; //
+import { showGenericModal } from "./modal_handler.js";
+import {
+  showSuccessNotification,
+  showErrorNotification,
+  showWarningNotification,
+  showConfirmationModal,
+  showAdminNotesModal,
+  showBookingRejectionModal,
+  showNewRejectionModal,
+  showNewRejectionSuccessModal,
+} from "./notification-modal.js";
+import {
+  showRefreshIndicator,
+  hideRefreshIndicator,
+  showSuccessIndicator,
+  showSuccessNotification as showToastSuccess,
+  showInfoNotification as showToastInfo,
+  showWarningNotification as showToastWarning,
+} from "./realtime-indicator.js";
+// Removed real-time rejection monitoring
+import { initializeAcceptanceMonitoring } from "./realtime-acceptance-monitor.js";
 
 let allBookingsData = {};
 let currentStatusFilter = "Pending"; // Default filter to show only pending bookings
 let currentDateFilter = "all"; // Default date filter
+let refreshInterval; // Variable to store the refresh interval
 
 document.addEventListener("DOMContentLoaded", async () => {
   const bookingsTableBody = document.getElementById("bookingsTableBody");
@@ -52,8 +73,11 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   // Event listener for the refresh button
   if (refreshButton) {
-    refreshButton.addEventListener("click", () => {
-      applyFilters(); // Re-render table when refresh button is clicked
+    refreshButton.addEventListener("click", async () => {
+      await applyFilters(); // Re-render table when refresh button is clicked
+
+      // Show refresh success notification
+      showToastSuccess("Bookings refreshed successfully!");
     });
   }
 
@@ -324,10 +348,11 @@ document.addEventListener("DOMContentLoaded", async () => {
       }
 
       const row = document.createElement("tr");
-      const canAccept = booking.status === "Pending" && isBookingDetailsComplete(booking);
+      const canAccept =
+        booking.status === "Pending" && isBookingDetailsComplete(booking);
       const acceptDisabledAttr = canAccept
         ? ""
-        : "disabled aria-disabled=\"true\" title=\"Complete vaccination record to accept\"";
+        : 'disabled aria-disabled="true" title="Complete vaccination record to accept"';
       row.innerHTML = `
         <td>${booking.id}</td>
         <td>${booking.petInformation?.petName || "N/A"}</td>
@@ -417,19 +442,59 @@ document.addEventListener("DOMContentLoaded", async () => {
     const bookingId = e.target.getAttribute("data-id");
     const booking = allBookingsData[bookingId];
     if (!isBookingDetailsComplete(booking)) {
-      alert("Cannot accept booking: vaccination record is missing.");
+      showWarningNotification(
+        "Cannot Accept Booking",
+        "Vaccination record is missing.",
+        "Please ensure the customer has uploaded their pet's vaccination record before accepting this booking.",
+        "⚠️"
+      );
       return;
     }
-    const confirmAccept = await showConfirmation(
-      `Confirm Acceptance for Booking ID: ${bookingId}?`,
-      "Are you sure you want to accept this booking? This action will mark it as 'Approved'."
+    // Get customer name for the confirmation modal
+    const customerName = booking.ownerInformation
+      ? `${booking.ownerInformation.firstName || ""} ${booking.ownerInformation.lastName || ""}`.trim()
+      : "Unknown Customer";
+
+    const confirmAccept = await showConfirmationModal(
+      `Confirm Acceptance for ${customerName}?`,
+      "Are you sure you want to accept this booking? This action will mark it as 'Approved'.",
+      "Accept Booking",
+      "Cancel",
+      "This will change the booking status from 'Pending' to 'Approved' and make it visible in the approved bookings section.",
+      "❓"
     );
     if (confirmAccept) {
-      const adminNotes = prompt("Add admin notes (optional):");
+      const adminNotes = await showAdminNotesModal(
+        "Add Admin Notes for Booking Acceptance",
+        "Enter any notes or comments about accepting this booking...",
+        "Accept Booking"
+      );
       await updateBookingStatus(bookingId, "Accepted", adminNotes || "");
       renderBookingsTable(); // Re-render to reflect new status/filter
     }
   };
+
+  /**
+   * Converts rejection reason code to human-readable text
+   * @param {string} reasonCode - The rejection reason code
+   * @returns {string} Human-readable reason text
+   */
+  function getRejectionReasonText(reasonCode) {
+    const reasonMap = {
+      "vaccination-missing": "Missing or Invalid Vaccination Record",
+      "incomplete-information": "Incomplete Booking Information",
+      "capacity-full": "No Available Capacity",
+      "unsuitable-pet": "Pet Not Suitable for Service",
+      "behavior-concerns": "Pet Behavior Concerns",
+      "health-issues": "Pet Health Issues",
+      "owner-compliance": "Owner Non-Compliance",
+      "payment-issues": "Payment or Deposit Issues",
+      "schedule-conflict": "Schedule Conflict",
+      "policy-violation": "Policy Violation",
+      other: "Other Reason",
+    };
+    return reasonMap[reasonCode] || reasonCode;
+  }
 
   /**
    * Handles the click event for the "Reject" button.
@@ -437,13 +502,35 @@ document.addEventListener("DOMContentLoaded", async () => {
    */
   const handleRejectClick = async (e) => {
     const bookingId = e.target.getAttribute("data-id");
-    const confirmReject = await showConfirmation(
-      `Confirm Rejection for Booking ID: ${bookingId}?`,
-      "Are you sure you want to reject this booking? This action will mark it as 'Rejected'."
-    );
-    if (confirmReject) {
-      const adminNotes = prompt("Add admin notes (optional):");
-      await updateBookingStatus(bookingId, "Rejected", adminNotes || "");
+    const booking = allBookingsData[bookingId];
+
+    if (!booking) {
+      showErrorNotification(
+        "Booking Not Found",
+        "The booking data could not be retrieved.",
+        "Please refresh the page and try again, or contact support if the issue persists.",
+        "❌"
+      );
+      return;
+    }
+
+    // Use the new rejection modal
+    const rejectionData = await showNewRejectionModal(bookingId, booking);
+
+    if (rejectionData) {
+      // Use the selected reason and notes as the admin notes
+      const reasonText =
+        rejectionData.reason +
+        (rejectionData.notes ? ` - ${rejectionData.notes}` : "");
+
+      await updateBookingStatus(bookingId, "Rejected", reasonText);
+
+      // Show toast notification for rejection
+      showToastWarning("Booking rejected successfully!");
+
+      // Show success modal after rejection is completed
+      await showNewRejectionSuccessModal(bookingId, booking, rejectionData);
+
       renderBookingsTable(); // Re-render to reflect new status/filter
     }
   };
@@ -466,12 +553,20 @@ document.addEventListener("DOMContentLoaded", async () => {
    */
   const handleCheckinClick = async (e) => {
     const bookingId = e.target.getAttribute("data-id");
-    const confirmCheckin = await showConfirmation(
-      `Confirm Check In for Booking ID: ${bookingId}?`,
-      "Are you sure you want to check in this pet? This action will mark the booking as 'Check In'."
+    const confirmCheckin = await showConfirmationModal(
+      `Confirm Check In for this pet?`,
+      "Are you sure you want to check in this pet? This action will mark the booking as 'Check In'.",
+      "Check In Pet",
+      "Cancel",
+      "This will change the booking status from 'Approved' to 'Check In' and the pet will be officially checked into the facility.",
+      "🏠"
     );
     if (confirmCheckin) {
-      const adminNotes = prompt("Add check-in notes (optional):");
+      const adminNotes = await showAdminNotesModal(
+        "Add Check-in Notes",
+        "Enter any notes about the pet's check-in process...",
+        "Check In Pet"
+      );
       await updateBookingStatus(bookingId, "Check In", adminNotes || "");
       renderBookingsTable(); // Re-render to reflect new status/filter
     }
@@ -488,7 +583,12 @@ document.addEventListener("DOMContentLoaded", async () => {
     // Simple modal with basic information
     const booking = allBookingsData[bookingId];
     if (!booking) {
-      alert("Booking data not found!");
+      showErrorNotification(
+        "Booking Not Found",
+        "The booking data could not be retrieved.",
+        "Please refresh the page and try again, or contact support if the issue persists.",
+        "❌"
+      );
       return;
     }
 
@@ -509,7 +609,6 @@ document.addEventListener("DOMContentLoaded", async () => {
           <p><strong>Customer:</strong> ${customerName}</p>
           <p><strong>Pet Name:</strong> ${petName}</p>
           <p><strong>Service:</strong> ${serviceType}</p>
-          <p><strong>Booking ID:</strong> ${bookingId}</p>
         </div>
         
         <div style="background: #fff3cd; padding: 15px; border-radius: 8px; margin-bottom: 15px;">
@@ -558,7 +657,12 @@ document.addEventListener("DOMContentLoaded", async () => {
       if (closeFooterBtn) closeFooterBtn.onclick = closeModal;
       if (overlay) overlay.onclick = closeModal;
     } else {
-      alert("Modal elements not found!");
+      showErrorNotification(
+        "Modal Error",
+        "Modal elements not found.",
+        "Please refresh the page and try again.",
+        "❌"
+      );
     }
   };
 
@@ -605,7 +709,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     let detailsHtml = `
       <div class="modal-section">
         <h3>General Information</h3>
-        <div class="info-item"><strong>Booking ID:</strong> <p>${bookingId}</p></div>
+        <div class="info-item"><strong>Customer:</strong> <p>${customerName}</p></div>
         <div class="info-item"><strong>Service Type:</strong> <p>${bookingData.serviceType || "N/A"}</p></div>
         <div class="info-item"><strong>Status:</strong> <p>${bookingData.status || "N/A"}</p></div>
         <div class="info-item"><strong>Preferred Date:</strong> <p>${bookingData.date || "N/A"}</p></div>
@@ -810,6 +914,119 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 
   /**
+   * Shows a notification modal when a booking is successfully accepted by the admin.
+   * @param {string} bookingId - The ID of the accepted booking.
+   * @param {object} bookingData - The booking data from Firestore.
+   */
+  async function showBookingAcceptanceNotification(bookingId, bookingData) {
+    try {
+      // Get customer information
+      const customerName = bookingData.ownerInformation
+        ? `${bookingData.ownerInformation.firstName || ""} ${bookingData.ownerInformation.lastName || ""}`.trim()
+        : "N/A";
+
+      const petName = bookingData.petInformation?.petName || "N/A";
+      const serviceType = bookingData.serviceType || "N/A";
+      const roomType = bookingData.boardingDetails?.selectedRoomType || "N/A";
+
+      // Format check-in date
+      let checkInDate = "N/A";
+      if (bookingData.boardingDetails?.checkInDate) {
+        checkInDate = new Date(
+          bookingData.boardingDetails.checkInDate
+        ).toLocaleDateString();
+      } else if (bookingData.date) {
+        checkInDate = new Date(bookingData.date).toLocaleDateString();
+      }
+
+      // Format check-out date
+      let checkOutDate = "N/A";
+      if (bookingData.boardingDetails?.checkOutDate) {
+        checkOutDate = new Date(
+          bookingData.boardingDetails.checkOutDate
+        ).toLocaleDateString();
+      }
+
+      // Create notification modal content
+      const notificationContent = `
+        <div class="modal-section" style="background: #d4edda; padding: 25px; border-radius: 12px; margin-bottom: 20px; border-left: 5px solid #28a745;">
+          <div style="text-align: center; margin-bottom: 20px;">
+            <div style="font-size: 4em; color: #28a745; margin-bottom: 15px;">✅</div>
+            <h3 style="color: #155724; margin: 0; font-size: 1.5em; font-weight: bold;">Booking Successfully Accepted!</h3>
+            <p style="color: #155724; margin: 10px 0 0 0; font-size: 1.1em;">The booking has been approved and is now ready for check-in.</p>
+          </div>
+        </div>
+
+        <div class="modal-section" style="background: #f8f9fa; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
+          <h3 style="color: #333; margin-bottom: 15px; border-bottom: 2px solid #ffb64a; padding-bottom: 10px;">📋 Booking Details</h3>
+          <div class="info-item" style="margin-bottom: 12px; padding: 8px; background: white; border-radius: 6px;">
+            <strong style="color: #333;">Customer:</strong> 
+            <span style="font-weight: normal; color: #666; float: right;">${customerName}</span>
+          </div>
+          <div class="info-item" style="margin-bottom: 12px; padding: 8px; background: white; border-radius: 6px;">
+            <strong style="color: #333;">Pet Name:</strong> 
+            <span style="font-weight: normal; color: #666; float: right;">${petName}</span>
+          </div>
+          <div class="info-item" style="margin-bottom: 12px; padding: 8px; background: white; border-radius: 6px;">
+            <strong style="color: #333;">Service Type:</strong> 
+            <span style="font-weight: normal; color: #666; float: right;">${serviceType}</span>
+          </div>
+          <div class="info-item" style="margin-bottom: 12px; padding: 8px; background: white; border-radius: 6px;">
+            <strong style="color: #333;">Room Type:</strong> 
+            <span style="font-weight: normal; color: #666; float: right;">${roomType}</span>
+          </div>
+          <div class="info-item" style="margin-bottom: 12px; padding: 8px; background: white; border-radius: 6px;">
+            <strong style="color: #333;">Check-in Date:</strong> 
+            <span style="font-weight: normal; color: #666; float: right;">${checkInDate}</span>
+          </div>
+          <div class="info-item" style="margin-bottom: 0; padding: 8px; background: white; border-radius: 6px;">
+            <strong style="color: #333;">Check-out Date:</strong> 
+            <span style="font-weight: normal; color: #666; float: right;">${checkOutDate}</span>
+          </div>
+        </div>
+
+        <div class="modal-section" style="background: #e2e3e5; padding: 20px; border-radius: 8px; text-align: center;">
+          <h3 style="color: #495057; margin-bottom: 15px;">📝 Next Steps</h3>
+          <div style="background: white; padding: 15px; border-radius: 6px; margin-bottom: 15px;">
+            <p style="color: #495057; margin: 0; font-size: 1.05em;">
+              <strong>1.</strong> The customer will be notified of the approval<br>
+              <strong>2.</strong> The booking is now visible in the "Approved Bookings" section<br>
+              <strong>3.</strong> You can proceed with check-in when the customer arrives
+            </p>
+          </div>
+          <div style="background: #d1ecf1; padding: 12px; border-radius: 6px; border: 1px solid #bee5eb;">
+            <p style="color: #0c5460; margin: 0; font-weight: bold;">
+              💡 <strong>Tip:</strong> You can view all approved bookings in the "Bookings" section of the dashboard.
+            </p>
+          </div>
+        </div>
+      `;
+
+      // Get modal elements
+      const modal = document.getElementById("viewDetailsModal");
+      const modalContentDiv = document.getElementById("bookingDetailsContent");
+
+      if (modal && modalContentDiv) {
+        // Use showGenericModal from modal_handler.js
+        await showGenericModal(
+          modal,
+          `Booking Accepted - ${customerName}`,
+          notificationContent,
+          modalContentDiv
+        );
+      } else {
+        console.error("Modal elements not found for notification!");
+        // Fallback to alert if modal elements not found
+        alert(`Booking ${bookingId} has been successfully accepted!`);
+      }
+    } catch (error) {
+      console.error("Error showing booking acceptance notification:", error);
+      // Fallback to alert if there's an error
+      alert(`Booking ${bookingId} has been successfully accepted!`);
+    }
+  }
+
+  /**
    * Updates the status of a booking in Firestore and adds admin notes.
    * @param {string} bookingId - The ID of the booking to update.
    * @param {string} newStatus - The new status to set (e.g., "Accepted", "Rejected").
@@ -845,7 +1062,16 @@ document.addEventListener("DOMContentLoaded", async () => {
       console.log(
         `Booking ${bookingId} has been ${statusToUpdate.toLowerCase()}.`
       );
-      alert(`Booking ${statusToUpdate.toLowerCase()} successfully!`);
+
+      // Show success notification modal instead of alert
+      if (statusToUpdate === "Approved") {
+        await showBookingAcceptanceNotification(bookingId, bookingData);
+      } else if (statusToUpdate === "Rejected") {
+        // Rejection success notification is handled by the new rejection flow
+        // No need to show additional notification here
+      } else {
+        alert(`Booking ${statusToUpdate.toLowerCase()} successfully!`);
+      }
     } catch (error) {
       console.error("Error updating booking status:", error);
       alert("Failed to update booking status: " + error.message);
@@ -912,8 +1138,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     const modalContent = `
       <div class="modal-section" style="background: #f8f9fa; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
         <h3 style="color: #333; margin-bottom: 15px; border-bottom: 2px solid #ffb64a; padding-bottom: 10px;">🐾 Pet Checkout Information</h3>
-        <div class="info-item" style="margin-bottom: 10px;"><strong>Booking ID:</strong> <span style="font-weight: normal; color: #666;">${bookingId}</span></div>
-        <div class="info-item" style="margin-bottom: 10px;"><strong>Customer Name:</strong> <span style="font-weight: normal; color: #666;">${customerName}</span></div>
+        <div class="info-item" style="margin-bottom: 10px;"><strong>Customer:</strong> <span style="font-weight: normal; color: #666;">${customerName}</span></div>
         <div class="info-item" style="margin-bottom: 10px;"><strong>Pet Name:</strong> <span style="font-weight: normal; color: #666;">${bookingData.petInformation?.petName || "N/A"}</span></div>
         <div class="info-item" style="margin-bottom: 10px;"><strong>Service Type:</strong> <span style="font-weight: normal; color: #666;">${bookingData.serviceType || "N/A"}</span></div>
         <div class="info-item" style="margin-bottom: 10px;"><strong>Room Type:</strong> <span style="font-weight: normal; color: #666;">${bookingData.boardingDetails?.selectedRoomType || "N/A"}</span></div>
@@ -1059,4 +1284,54 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (weightKg > 38) return "XXL";
     return "N/A"; // Fallback for weights outside defined ranges
   }
+
+  // Start real-time refresh (every 30 seconds)
+  startRealTimeRefresh();
+
+  // Removed rejection monitoring - no longer needed
+
+  // Initialize acceptance monitoring
+  initializeAcceptanceMonitoring();
 });
+
+/**
+ * Starts the real-time refresh functionality
+ */
+function startRealTimeRefresh() {
+  // Clear any existing interval
+  if (refreshInterval) {
+    clearInterval(refreshInterval);
+  }
+
+  // Set up new interval to refresh every 30 seconds
+  refreshInterval = setInterval(async () => {
+    try {
+      console.log("Auto-refreshing bookings data...");
+
+      await applyFilters();
+    } catch (error) {
+      console.error("Error during auto-refresh:", error);
+    }
+  }, 30000); // 30 seconds
+
+  console.log("Real-time refresh started (every 30 seconds)");
+}
+
+/**
+ * Stops the real-time refresh functionality
+ */
+function stopRealTimeRefresh() {
+  if (refreshInterval) {
+    clearInterval(refreshInterval);
+    refreshInterval = null;
+    console.log("Real-time refresh stopped");
+  }
+}
+
+/**
+ * Restarts the real-time refresh functionality
+ */
+function restartRealTimeRefresh() {
+  stopRealTimeRefresh();
+  startRealTimeRefresh();
+}

@@ -1,6 +1,7 @@
 // js/logout-handler.js
 
 import { auth, logoutUser } from "./firebase-config.js";
+import { showErrorNotification } from "./notification-modal.js";
 
 // Handle logout process
 async function handleLogout() {
@@ -9,10 +10,13 @@ async function handleLogout() {
     window.location.href = "index.html"; // Redirect to login page on successful logout
   } else {
     console.error("Logout failed:", result.error);
-    alert(
+    showErrorNotification(
+      "Logout Failed",
       result.error ||
         "Failed to logout: " +
-          (result.error ? result.error.message : "Unknown error")
+          (result.error ? result.error.message : "Unknown error"),
+      "Please try again or contact support if the issue persists.",
+      "❌"
     );
   }
 }

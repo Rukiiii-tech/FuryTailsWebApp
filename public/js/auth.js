@@ -7,6 +7,7 @@ import {
   doc,
   loginUser,
 } from "./firebase-config.js";
+import { showErrorNotification } from "./notification-modal.js";
 
 async function checkAdminStatus(user) {
   if (!user) {
@@ -38,7 +39,12 @@ onAuthStateChanged(auth, async (user) => {
       }
     } else {
       if (currentPage !== "index.html") {
-        alert("Access Denied: You do not have administrator privileges.");
+        showErrorNotification(
+          "Access Denied",
+          "You do not have administrator privileges.",
+          "Only administrators can access this dashboard. Please contact your system administrator.",
+          "🚫"
+        );
         await auth.signOut();
         window.location.href = "index.html";
       }
@@ -77,7 +83,12 @@ document.addEventListener("DOMContentLoaded", () => {
       if (result.success) {
         // Redirection is handled by onAuthStateChanged listener
       } else {
-        alert(result.error);
+        showErrorNotification(
+          "Login Failed",
+          result.error,
+          "Please check your credentials and try again.",
+          "❌"
+        );
       }
     });
   }

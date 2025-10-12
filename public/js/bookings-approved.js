@@ -14,10 +14,28 @@ import {
   showGenericModal,
   initializeModalCloseListeners,
 } from "./modal_handler.js";
+import {
+  showSuccessNotification,
+  showErrorNotification,
+  showWarningNotification,
+  showConfirmationModal,
+  showAdminNotesModal,
+  showCheckoutSuccessNotification,
+  showCheckoutConfirmationModal,
+} from "./notification-modal.js";
+import {
+  showRefreshIndicator,
+  hideRefreshIndicator,
+  showSuccessIndicator,
+  showSuccessNotification as showToastSuccess,
+} from "./realtime-indicator.js";
+// Removed real-time rejection monitoring
+import { initializeAcceptanceMonitoring } from "./realtime-acceptance-monitor.js";
 
 // Global variables
 let allApprovedBookingsData = {};
 let currentStatusFilter = "All"; // Default filter to show all approved bookings
+let refreshInterval; // Variable to store the refresh interval
 
 // Test Firebase imports
 console.log("Testing Firebase imports in bookings-approved.js:");
@@ -45,8 +63,11 @@ if (!refreshButton) {
 
 // Event listeners
 if (refreshButton) {
-  refreshButton.addEventListener("click", () => {
-    renderApprovedBookingsTable();
+  refreshButton.addEventListener("click", async () => {
+    await renderApprovedBookingsTable();
+
+    // Show refresh success notification
+    showToastSuccess("Approved bookings refreshed successfully!");
   });
 }
 
@@ -491,7 +512,7 @@ window.viewApprovedBookingDetails = async function (bookingId) {
     const modalContent = `
       <div class="modal-section">
         <h3>General Information</h3>
-        <div class="info-item"><strong>Booking ID:</strong> <p>${booking.bookingId || booking.id}</p></div>
+        <div class="info-item"><strong>Customer:</strong> <p>${customerName}</p></div>
         <div class="info-item"><strong>Service Type:</strong> <p>${serviceType}</p></div>
         <div class="info-item"><strong>Status:</strong> <p>${booking.status}</p></div>
         <div class="info-item"><strong>Check-in Date:</strong> <p>${checkInDate}</p></div>
@@ -529,7 +550,7 @@ window.viewApprovedBookingDetails = async function (bookingId) {
       <div class="modal-section">
         <h3>Payment Details</h3>
         <div class="info-item"><strong>Method:</strong> <p>${booking.paymentDetails?.method || "N/A"}</p></div>
-        <div class="info-item"><strong>Account No.:</strong> <p>${booking.paymentDetails?.accountNumber || "N/A"}</p></div>
+        <div class="info-item"><strong>Account No:</strong> <p>${booking.paymentDetails?.accountNumber || "N/A"}</p></div>
         <div class="info-item"><strong>Account Name:</strong> <p>${booking.paymentDetails?.accountName || "N/A"}</p></div>
         <div class="info-item"><strong>Total Amount:</strong> <p>₱${booking.totalAmount || "N/A"}</p></div>
         <div class="info-item"><strong>Down Payment:</strong> <p>₱${booking.downPayment || "N/A"}</p></div>
@@ -573,12 +594,21 @@ window.viewApprovedBookingDetails = async function (bookingId) {
 window.handleCheckinClick = async function (bookingId) {
   console.log("Check-in button clicked for booking:", bookingId);
 
-  const confirmCheckin = confirm(
-    `Confirm Check In for Booking ID: ${bookingId}?\n\nAre you sure you want to check in this pet? This action will mark the booking as 'Check In'.`
+  const confirmCheckin = await showConfirmationModal(
+    `Confirm Check In for this pet?`,
+    "Are you sure you want to check in this pet? This action will mark the booking as 'Check In'.",
+    "Check In Pet",
+    "Cancel",
+    "This will change the booking status from 'Approved' to 'Check In' and the pet will be officially checked into the facility.",
+    "🏠"
   );
 
   if (confirmCheckin) {
-    const adminNotes = prompt("Add check-in notes (optional):");
+    const adminNotes = await showAdminNotesModal(
+      "Add Check-in Notes",
+      "Enter any notes about the pet's check-in process...",
+      "Check In Pet"
+    );
     try {
       const bookingRef = doc(db, "bookings", bookingId);
       await updateDoc(bookingRef, {
@@ -588,13 +618,23 @@ window.handleCheckinClick = async function (bookingId) {
       });
 
       console.log(`Booking ${bookingId} has been checked in.`);
-      alert(`Booking ${bookingId} has been checked in successfully!`);
+      showSuccessNotification(
+        "Pet Checked In Successfully",
+        `Booking ${bookingId} has been checked in successfully!`,
+        "The pet is now officially checked into the facility and the booking status has been updated.",
+        "🏠"
+      );
 
       // Refresh the table to show the updated status
       renderApprovedBookingsTable();
     } catch (error) {
       console.error("Error updating booking status:", error);
-      alert("Failed to update booking status: " + error.message);
+      showErrorNotification(
+        "Check-in Failed",
+        "Failed to update booking status: " + error.message,
+        "Please check your internet connection and try again.",
+        "❌"
+      );
     }
   }
 };
@@ -615,6 +655,7 @@ window.handleCheckoutClick = async function (bookingId) {
     }
 
     // Calculate balance using the same logic as the main bookings page
+    // NOTE: This call now uses the fixed logic to calculate amounts based on actual stay duration.
     const { totalAmount, downPayment, balance } =
       calculateBookingAmounts(booking);
 
@@ -627,8 +668,7 @@ window.handleCheckoutClick = async function (bookingId) {
     const modalContent = `
       <div class="modal-section" style="background: #f8f9fa; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
         <h3 style="color: #333; margin-bottom: 15px; border-bottom: 2px solid #ffb64a; padding-bottom: 10px;">🐾 Pet Checkout Information</h3>
-        <div class="info-item" style="margin-bottom: 10px;"><strong>Booking ID:</strong> <span style="font-weight: normal; color: #666;">${bookingId}</span></div>
-        <div class="info-item" style="margin-bottom: 10px;"><strong>Customer Name:</strong> <span style="font-weight: normal; color: #666;">${customerName}</span></div>
+        <div class="info-item" style="margin-bottom: 10px;"><strong>Customer:</strong> <span style="font-weight: normal; color: #666;">${customerName}</span></div>
         <div class="info-item" style="margin-bottom: 10px;"><strong>Pet Name:</strong> <span style="font-weight: normal; color: #666;">${booking.petInformation?.petName || "N/A"}</span></div>
         <div class="info-item" style="margin-bottom: 10px;"><strong>Service Type:</strong> <span style="font-weight: normal; color: #666;">${booking.serviceType || "N/A"}</span></div>
         <div class="info-item" style="margin-bottom: 10px;"><strong>Room Type:</strong> <span style="font-weight: normal; color: #666;">${booking.boardingDetails?.selectedRoomType || "N/A"}</span></div>
@@ -665,7 +705,7 @@ window.handleCheckoutClick = async function (bookingId) {
       <div class="modal-section" style="background: #d1ecf1; padding: 20px; border-radius: 8px; text-align: center;">
         <h3 style="color: #0c5460; margin-bottom: 15px;">✅ Ready for Checkout</h3>
         <p style="color: #0c5460; font-size: 1.1em; margin: 0;">Please collect the remaining balance of <strong style="color: #dc3545;">₱${balance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong> from the customer.</p>
-        <p style="color: #28a745; font-weight: bold; margin: 10px 0; font-size: 0.9em;">⚠️ Note: Confirming checkout will mark the payment as "Paid" and set the balance to ₱0.00</p>
+        <p style="color: #28a745; font-weight: bold; margin: 10px 0; font-size: 0.9em;">⚠️ **Action Note:** Confirming checkout requires payment collection and will update the booking status to 'Checked-Out' and the payment status to 'Paid'.</p>
         <div style="margin-top: 20px;">
           <button id="confirmCheckoutBtn" style="background: #28a745; color: white; border: none; padding: 12px 24px; border-radius: 6px; font-size: 1.1em; font-weight: bold; cursor: pointer; margin-right: 10px;">
             ✅ Confirm Checkout
@@ -782,6 +822,16 @@ async function handleConfirmCheckout(bookingId, booking) {
       throw new Error("Booking data is required");
     }
 
+    // Show confirmation modal first
+    const confirmed = await showCheckoutConfirmationModal(bookingId, booking);
+
+    if (!confirmed) {
+      console.log("Checkout cancelled by user");
+      return; // User cancelled, don't proceed with checkout
+    }
+
+    console.log("User confirmed checkout, proceeding with checkout process...");
+
     // Update the booking status to "Checked-Out"
     try {
       const bookingRef = doc(db, "bookings", bookingId);
@@ -824,13 +874,9 @@ async function handleConfirmCheckout(bookingId, booking) {
       );
     }
 
-    // Show success message
+    // Show success notification modal
     const isExtended = booking.status === "Extended";
-    const message = isExtended
-      ? "✅ Extended booking checkout confirmed successfully! The booking status has been updated to 'Checked-Out' and payment status has been marked as 'Paid'."
-      : "✅ Checkout confirmed successfully! The booking status has been updated to 'Checked-Out' and payment status has been marked as 'Paid'.";
-
-    alert(message);
+    await showCheckoutSuccessNotification(bookingId, booking, isExtended);
 
     // Refresh the table to reflect the changes
     await renderApprovedBookingsTable();
@@ -1211,20 +1257,54 @@ function calculateBookingAmounts(bookingData) {
     // Base price per day depends on pet size
     let dailyPrice = sizePrices[petSize] || 0;
 
-    // Calculate total based on number of days
+    // --- START OF FIX: Calculate actual days stayed for accurate billing on early checkout ---
+
     const checkInDateStr =
       bookingData.boardingDetails?.checkInDate || bookingData.date;
-    const checkOutDateStr = bookingData.boardingDetails?.checkOutDate;
 
-    if (checkInDateStr && checkOutDateStr) {
-      const checkInDate = new Date(checkInDateStr);
-      const checkOutDate = new Date(checkOutDateStr);
-      const diffTime = Math.abs(checkOutDate.getTime() - checkInDate.getTime());
-      const daysDiff = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-      totalAmount = dailyPrice * Math.max(1, daysDiff); // Ensure at least 1 day
+    if (checkInDateStr) {
+      // 1. Determine the Check-in Date
+      let checkInDate;
+      try {
+        checkInDate = checkInDateStr.toDate(); // Attempt to convert Firestore Timestamp
+      } catch (e) {
+        checkInDate = new Date(checkInDateStr); // Fallback to convert ISO string
+      }
+      checkInDate.setHours(0, 0, 0, 0); // Normalize to start of day for accurate day calculation
+
+      // 2. Determine the Effective Checkout Date (Today)
+      // This is the date the checkout button is pressed.
+      const effectiveCheckOutDate = new Date();
+      // Set to end of the day to ensure the current day is fully counted
+      effectiveCheckOutDate.setHours(23, 59, 59, 999);
+
+      // 3. Calculate ACTUAL days stayed
+      const diffTime = Math.abs(
+        effectiveCheckOutDate.getTime() - checkInDate.getTime()
+      );
+
+      // Calculate days difference and round up (standard boarding practice)
+      let daysDiff = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+      // 4. Ensure minimum charge of 1 day
+      const actualDaysStayed = Math.max(1, daysDiff);
+
+      // 5. Calculate New Total Amount
+      totalAmount = dailyPrice * actualDaysStayed;
+
+      console.log(`Boarding Billing Fix Debug:`);
+      console.log(`Daily Price (${petSize}): ₱${dailyPrice.toFixed(2)}`);
+      console.log(`Check In: ${checkInDate.toLocaleDateString()}`);
+      console.log(
+        `Effective Checkout (Today): ${effectiveCheckOutDate.toLocaleDateString()}`
+      );
+      console.log(`Actual Days Charged: ${actualDaysStayed}`);
+      console.log(`Calculated Total Amount: ₱${totalAmount.toFixed(2)}`);
     } else {
       totalAmount = 0; // If dates are missing, total is 0
     }
+
+    // --- END OF FIX ---
   } else if (bookingData.serviceType === "Grooming") {
     // Grooming price also depends on pet size
     totalAmount = sizePrices[petSize] || 0;
@@ -1263,3 +1343,57 @@ function getPetSizeCategory(weightKg) {
 
 // Initial load of approved bookings table
 renderApprovedBookingsTable();
+
+// Start real-time refresh (every 30 seconds)
+startRealTimeRefresh();
+
+// Removed rejection monitoring - no longer needed
+
+// Initialize acceptance monitoring
+initializeAcceptanceMonitoring();
+
+/**
+ * Starts the real-time refresh functionality
+ */
+function startRealTimeRefresh() {
+  // Clear any existing interval
+  if (refreshInterval) {
+    clearInterval(refreshInterval);
+  }
+
+  // Set up new interval to refresh every 30 seconds
+  refreshInterval = setInterval(async () => {
+    try {
+      console.log("Auto-refreshing approved bookings data...");
+
+      await renderApprovedBookingsTable();
+
+      // No notification needed for auto-refresh
+    } catch (error) {
+      console.error("Error during auto-refresh:", error);
+    }
+  }, 30000); // 30 seconds
+
+  console.log(
+    "Real-time refresh started for approved bookings (every 30 seconds)"
+  );
+}
+
+/**
+ * Stops the real-time refresh functionality
+ */
+function stopRealTimeRefresh() {
+  if (refreshInterval) {
+    clearInterval(refreshInterval);
+    refreshInterval = null;
+    console.log("Real-time refresh stopped");
+  }
+}
+
+/**
+ * Restarts the real-time refresh functionality
+ */
+function restartRealTimeRefresh() {
+  stopRealTimeRefresh();
+  startRealTimeRefresh();
+}

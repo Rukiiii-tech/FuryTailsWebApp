@@ -15,18 +15,35 @@ import {
   hideGenericModal,
   initializeModalCloseListeners,
 } from "./modal_handler.js";
+import { showErrorNotification } from "./notification-modal.js";
+import { showSuccessNotification as showToastSuccess } from "./realtime-indicator.js";
 
 document.addEventListener("DOMContentLoaded", async () => {
   const reportsTableBody = document.getElementById("reportsTableBody");
   const statusFilterSelect = document.getElementById("statusFilter");
   const refreshButton = document.getElementById("refreshReportsBtn");
-  
+
+  // Pagination elements
+  const paginationInfo = document.getElementById("paginationInfo");
+  const firstPageBtn = document.getElementById("firstPageBtn");
+  const prevPageBtn = document.getElementById("prevPageBtn");
+  const nextPageBtn = document.getElementById("nextPageBtn");
+  const lastPageBtn = document.getElementById("lastPageBtn");
+  const paginationNumbers = document.getElementById("paginationNumbers");
+  const pageSizeSelect = document.getElementById("pageSizeSelect");
+
   if (!reportsTableBody) {
     console.error("reportsTableBody not found!");
     return;
   }
 
   let currentStatusFilter = "All"; // Default filter to show all processed bookings
+
+  // Pagination variables
+  let allReportsData = []; // Store all fetched reports
+  let currentPage = 1;
+  let pageSize = 25; // Default page size
+  let totalPages = 0;
 
   // Event listener for the status filter dropdown
   if (statusFilterSelect) {
@@ -40,6 +57,51 @@ document.addEventListener("DOMContentLoaded", async () => {
   if (refreshButton) {
     refreshButton.addEventListener("click", () => {
       fetchBookingReports(); // Re-fetch reports when refresh button is clicked
+
+      // Show refresh success notification
+      showToastSuccess("Booking reports refreshed successfully!");
+    });
+  }
+
+  // Pagination event listeners
+  if (firstPageBtn) {
+    firstPageBtn.addEventListener("click", () => {
+      currentPage = 1;
+      renderCurrentPage();
+    });
+  }
+
+  if (prevPageBtn) {
+    prevPageBtn.addEventListener("click", () => {
+      if (currentPage > 1) {
+        currentPage--;
+        renderCurrentPage();
+      }
+    });
+  }
+
+  if (nextPageBtn) {
+    nextPageBtn.addEventListener("click", () => {
+      if (currentPage < totalPages) {
+        currentPage++;
+        renderCurrentPage();
+      }
+    });
+  }
+
+  if (lastPageBtn) {
+    lastPageBtn.addEventListener("click", () => {
+      currentPage = totalPages;
+      renderCurrentPage();
+    });
+  }
+
+  if (pageSizeSelect) {
+    pageSizeSelect.addEventListener("change", (e) => {
+      pageSize = parseInt(e.target.value);
+      currentPage = 1; // Reset to first page when changing page size
+      calculateTotalPages();
+      renderCurrentPage();
     });
   }
 
@@ -66,32 +128,42 @@ document.addEventListener("DOMContentLoaded", async () => {
       reportsTableBody.innerHTML =
         '<tr><td colspan="8" style="text-align: center; padding: 20px;">Loading booking reports...</td></tr>';
       const bookingsCollectionRef = collection(db, "bookings");
-      
+
       // Apply filter based on current selection
       let q;
       if (currentStatusFilter === "All") {
         // Show both approved and rejected bookings (processed bookings)
         q = query(
-          bookingsCollectionRef, 
+          bookingsCollectionRef,
           where("status", "in", ["Approved", "Rejected"])
         );
       } else {
         // Show only the selected status
-        q = query(bookingsCollectionRef, where("status", "==", currentStatusFilter));
+        q = query(
+          bookingsCollectionRef,
+          where("status", "==", currentStatusFilter)
+        );
       }
-      
+
       const querySnapshot = await getDocs(q);
 
       if (querySnapshot.empty) {
-        const filterText = currentStatusFilter === "All" ? "processed" : currentStatusFilter.toLowerCase();
-        reportsTableBody.innerHTML =
-          `<tr><td colspan="8" style="text-align: center;">No ${filterText} booking reports found.</td></tr>`;
+        const filterText =
+          currentStatusFilter === "All"
+            ? "processed"
+            : currentStatusFilter.toLowerCase();
+        reportsTableBody.innerHTML = `<tr><td colspan="8" style="text-align: center;">No ${filterText} booking reports found.</td></tr>`;
+        allReportsData = [];
+        calculateTotalPages();
+        updatePaginationInfo();
+        updatePaginationControls();
         return;
       }
 
-      reportsTableBody.innerHTML = "";
-
+      // Store all data for pagination
+      allReportsData = [];
       let reportCounter = 1;
+
       for (const docSnapshot of querySnapshot.docs) {
         const data = docSnapshot.data();
         const bookingId = docSnapshot.id;
@@ -122,9 +194,13 @@ document.addEventListener("DOMContentLoaded", async () => {
 
         let durationDays = "N/A";
         let roomType = "N/A";
-        
+
         // Handle both boarding and grooming services
-        if (data.serviceType === "Boarding" && boarding.checkInDate && boarding.checkOutDate) {
+        if (
+          data.serviceType === "Boarding" &&
+          boarding.checkInDate &&
+          boarding.checkOutDate
+        ) {
           const checkIn = new Date(boarding.checkInDate);
           const checkOut = new Date(boarding.checkOutDate);
           const diffTime = Math.abs(checkOut.getTime() - checkIn.getTime());
@@ -135,22 +211,25 @@ document.addEventListener("DOMContentLoaded", async () => {
           roomType = "Grooming Service";
         }
 
-        const row = `
-                    <tr>
-                        <td>RPT${String(reportCounter++).padStart(3, "0")}</td>
-                        <td>${bookingId}</td>
-                        <td>${pet.petName || "N/A"}</td>
-                        <td>${ownerFullName}</td>
-                        <td>${roomType}</td>
-                        <td>${durationDays !== "N/A" ? `${durationDays} day${durationDays > 1 ? "s" : ""}` : "N/A"}</td>
-                        <td><span class="status-badge status-${data.status ? data.status.toLowerCase().replace(" ", "-") : "unknown"}">${data.status || "N/A"}</span></td>
-                        <td>
-                          <button class="action-btn btn-view" data-id="${bookingId}">View</button>
-                        </td>
-                    </tr>
-                `;
-        reportsTableBody.innerHTML += row;
+        // Store report data for pagination
+        allReportsData.push({
+          reportId: `RPT${String(reportCounter++).padStart(3, "0")}`,
+          bookingId: bookingId,
+          petName: pet.petName || "N/A",
+          ownerName: ownerFullName,
+          roomType: roomType,
+          durationDays: durationDays,
+          status: data.status || "N/A",
+          statusClass: data.status
+            ? data.status.toLowerCase().replace(" ", "-")
+            : "unknown",
+        });
       }
+
+      // Calculate pagination and render current page
+      calculateTotalPages();
+      currentPage = 1; // Reset to first page when fetching new data
+      renderCurrentPage();
     } catch (error) {
       let errorMsg = "Error loading reports. Check console for details.";
       if (error.code && error.code.includes("failed-precondition")) {
@@ -159,6 +238,109 @@ document.addEventListener("DOMContentLoaded", async () => {
       }
       console.error("Error fetching booking reports:", error);
       reportsTableBody.innerHTML = `<tr><td colspan="8" style="text-align: center; padding: 20px; color: red;">${errorMsg}</td></tr>`;
+      allReportsData = [];
+      calculateTotalPages();
+      updatePaginationInfo();
+      updatePaginationControls();
+    }
+  }
+
+  // Calculate total pages based on data and page size
+  function calculateTotalPages() {
+    totalPages = Math.ceil(allReportsData.length / pageSize);
+    if (totalPages === 0) totalPages = 1; // At least one page even with no data
+  }
+
+  // Render the current page
+  function renderCurrentPage() {
+    if (allReportsData.length === 0) {
+      const filterText =
+        currentStatusFilter === "All"
+          ? "processed"
+          : currentStatusFilter.toLowerCase();
+      reportsTableBody.innerHTML = `<tr><td colspan="8" style="text-align: center;">No ${filterText} booking reports found.</td></tr>`;
+      updatePaginationInfo();
+      updatePaginationControls();
+      return;
+    }
+
+    const startIndex = (currentPage - 1) * pageSize;
+    const endIndex = Math.min(startIndex + pageSize, allReportsData.length);
+    const currentPageData = allReportsData.slice(startIndex, endIndex);
+
+    reportsTableBody.innerHTML = "";
+
+    currentPageData.forEach((report) => {
+      const row = `
+        <tr>
+          <td>${report.reportId}</td>
+          <td>${report.bookingId}</td>
+          <td>${report.petName}</td>
+          <td>${report.ownerName}</td>
+          <td>${report.roomType}</td>
+          <td>${report.durationDays !== "N/A" ? `${report.durationDays} day${report.durationDays > 1 ? "s" : ""}` : "N/A"}</td>
+          <td><span class="status-badge status-${report.statusClass}">${report.status}</span></td>
+          <td>
+            <button class="action-btn btn-view" data-id="${report.bookingId}">View</button>
+          </td>
+        </tr>
+      `;
+      reportsTableBody.innerHTML += row;
+    });
+
+    updatePaginationInfo();
+    updatePaginationControls();
+  }
+
+  // Update pagination information
+  function updatePaginationInfo() {
+    if (!paginationInfo) return;
+
+    const startIndex = (currentPage - 1) * pageSize + 1;
+    const endIndex = Math.min(currentPage * pageSize, allReportsData.length);
+    const totalEntries = allReportsData.length;
+
+    if (totalEntries === 0) {
+      paginationInfo.textContent = "Showing 0 to 0 of 0 entries";
+    } else {
+      paginationInfo.textContent = `Showing ${startIndex} to ${endIndex} of ${totalEntries} entries`;
+    }
+  }
+
+  // Update pagination controls
+  function updatePaginationControls() {
+    // Update button states
+    if (firstPageBtn) firstPageBtn.disabled = currentPage === 1;
+    if (prevPageBtn) prevPageBtn.disabled = currentPage === 1;
+    if (nextPageBtn) nextPageBtn.disabled = currentPage === totalPages;
+    if (lastPageBtn) lastPageBtn.disabled = currentPage === totalPages;
+
+    // Update page numbers
+    if (paginationNumbers) {
+      paginationNumbers.innerHTML = "";
+
+      const maxVisiblePages = 5;
+      let startPage = Math.max(
+        1,
+        currentPage - Math.floor(maxVisiblePages / 2)
+      );
+      let endPage = Math.min(totalPages, startPage + maxVisiblePages - 1);
+
+      // Adjust start page if we're near the end
+      if (endPage - startPage + 1 < maxVisiblePages) {
+        startPage = Math.max(1, endPage - maxVisiblePages + 1);
+      }
+
+      for (let i = startPage; i <= endPage; i++) {
+        const pageBtn = document.createElement("button");
+        pageBtn.className = `page-number ${i === currentPage ? "active" : ""}`;
+        pageBtn.textContent = i;
+        pageBtn.addEventListener("click", () => {
+          currentPage = i;
+          renderCurrentPage();
+        });
+        paginationNumbers.appendChild(pageBtn);
+      }
     }
   }
 
@@ -198,13 +380,23 @@ document.addEventListener("DOMContentLoaded", async () => {
       bookingSnap = await getDoc(bookingRef);
     } catch (err) {
       console.error("Error fetching booking from Firestore:", err);
-      alert("Error fetching booking details: " + err.message);
+      showErrorNotification(
+        "Error Loading Booking",
+        "Error fetching booking details: " + err.message,
+        "Please check your internet connection and try again.",
+        "❌"
+      );
       return;
     }
 
     if (!bookingSnap.exists()) {
       console.log("Booking data not found in Firestore for ID: " + bookingId);
-      alert("Booking details not found.");
+      showErrorNotification(
+        "Booking Not Found",
+        "Booking details not found.",
+        "The booking may have been deleted or the ID may be incorrect.",
+        "❌"
+      );
       return;
     }
 

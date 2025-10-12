@@ -14,6 +14,7 @@ import {
   showGenericModal,
   initializeModalCloseListeners,
 } from "./modal_handler.js";
+import { showErrorNotification } from "./notification-modal.js";
 
 let allFeedingReportsData = {};
 let lastVisible = null; // Stores the last document of the current page for pagination
@@ -365,7 +366,12 @@ document.addEventListener("DOMContentLoaded", async () => {
           console.log(
             "Feeding report data not found in Firestore for ID: " + reportId
           );
-          alert("Feeding report not found.");
+          showErrorNotification(
+            "Report Not Found",
+            "Feeding report not found.",
+            "The report may have been deleted or the ID may be incorrect.",
+            "❌"
+          );
           return;
         }
         reportData = reportSnap.data();
@@ -373,7 +379,12 @@ document.addEventListener("DOMContentLoaded", async () => {
         console.log("Feeding report data fetched from Firestore:", reportData);
       } catch (err) {
         console.error("Error fetching feeding report from Firestore:", err);
-        alert("Error fetching feeding report details: " + err.message);
+        showErrorNotification(
+          "Error Loading Report",
+          "Error fetching feeding report details: " + err.message,
+          "Please check your internet connection and try again.",
+          "❌"
+        );
         return;
       }
     }
@@ -495,8 +506,8 @@ document.addEventListener("DOMContentLoaded", async () => {
     modalBody.innerHTML = `
         <div class="info-section">
           <div class="info-group">
-            <label>Booking ID</label>
-            <span>${reportData.bookingId || "N/A"}</span>
+            <label>Customer</label>
+            <span>${reportData.customerName || "N/A"}</span>
           </div>
           <div class="info-group">
             <label>Pet Name</label>

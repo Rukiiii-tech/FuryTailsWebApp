@@ -12,6 +12,7 @@ import {
   showGenericModal,
   initializeModalCloseListeners,
 } from "./modal_handler.js";
+import { showErrorNotification } from "./notification-modal.js";
 
 document.addEventListener("DOMContentLoaded", () => {
   console.log("DOM Content Loaded for users.html");
@@ -101,12 +102,22 @@ document.addEventListener("DOMContentLoaded", () => {
         );
       } else {
         console.error("User details not found in Firestore for ID:", userId);
-        alert("User details not found.");
+        showErrorNotification(
+          "User Not Found",
+          "User details not found.",
+          "The user may have been deleted or the ID may be incorrect.",
+          "❌"
+        );
         return;
       }
     } catch (error) {
       console.error("Error fetching user details from Firestore:", error);
-      alert("Failed to load user details: " + error.message);
+      showErrorNotification(
+        "Error Loading User",
+        "Failed to load user details: " + error.message,
+        "Please check your internet connection and try again.",
+        "❌"
+      );
       return;
     }
   }
