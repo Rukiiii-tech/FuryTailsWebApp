@@ -167,3 +167,4 @@ export function getAcceptanceMonitoringStatus() {
     hasListener: !!acceptanceListener,
   };
 }
+

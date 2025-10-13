@@ -176,6 +176,7 @@ async function loadSalesData() {
       ]),
       orderBy("timestamp", "desc")
     );
+    // ** THE LINE CAUSING THE FIREBASE INDEX ERROR **
     const querySnapshot = await getDocs(q);
 
     console.log(
